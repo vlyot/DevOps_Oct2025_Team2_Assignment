@@ -1,12 +1,12 @@
 # ----------------------
-# 核心安全忽略项 (必须有)
+# // main.gitignore for Auth Service
 # ----------------------
 .env
 .env.*
 !.env.example
 
 # ----------------------
-# Node.js 依赖与缓存
+# Node.js dependencies
 # ----------------------
 node_modules/
 npm-debug.log*
@@ -15,14 +15,14 @@ yarn-error.log*
 pnpm-debug.log*
 
 # ----------------------
-# 构建输出 (TypeScript 编译后的文件)
+# config files
 # ----------------------
 dist/
 build/
 *.tsbuildinfo
 
 # ----------------------
-# 系统文件
+# IDE files
 # ----------------------
 .DS_Store
 Thumbs.db
