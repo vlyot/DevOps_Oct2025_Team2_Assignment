@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import AdminPage from "./pages/AdminPage";
 
 // easy mock components for protected routes
 const AdminDashboard = () => <h1>Admin Area 🛡️ (Access Granted)</h1>;
@@ -13,7 +14,7 @@ function App() {
 
                 <Route path="/login" element={<Login />} />
 
-                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin" element={<AdminPage />} />
                 <Route path="/dashboard" element={<UserDashboard />} />
             </Routes>
         </BrowserRouter>

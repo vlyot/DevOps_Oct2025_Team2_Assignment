@@ -2,8 +2,10 @@ import express from 'express';
 import { supabase } from './lib/supabase';
 import jwt from 'jsonwebtoken';
 import {authorize} from "./middleware/authMiddleware";
+import cors from 'cors';
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 app.post('/login', async (req, res) => {

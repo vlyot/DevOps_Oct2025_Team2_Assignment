@@ -9,8 +9,6 @@ export default function Login() {
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-
         try {
             const response = await fetch('http://localhost:3000/login', {
                 method: 'POST',
@@ -20,25 +18,32 @@ export default function Login() {
 
             const data = await response.json();
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Login Failed');
-            }
+            if (response.ok) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('role', data.role);
 
-            // Token & Role
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('role', data.role);
-
-            // Redirect based on role
-            if (data.role === 'admin') {
-                navigate('/admin');
+                navigate(data.role === 'admin' ? '/admin' : '/dashboard');
             } else {
-                navigate('/dashboard');
+                setError(data.error || 'Login failed');
             }
-
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err) {
+            setError('Connection error: Is Auth Service running?');
         }
     };
+
+    const fetchFiles = async () => {
+        const token = localStorage.getItem('token');
+
+        const response = await fetch('http://localhost:3000/dashboard/files', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+        console.log(data.message); // "this is your personal document list"
+    };
+
 
     return (
         <div style={{ padding: '50px', maxWidth: '400px', margin: '0 auto', textAlign: 'center' }}>
