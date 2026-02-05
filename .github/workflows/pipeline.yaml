@@ -6,11 +6,9 @@ on:
   pull_request:
     branches: [ "develop", "main" ]
 
-  
 permissions:
   security-events: write  # Required to upload SARIF results
   contents: read          # Required to checkout code
-
 
 jobs:
   devsecops-pipeline:
