@@ -1,0 +1,28 @@
+# ----------------------
+# // main.gitignore for Auth Service
+# ----------------------
+.env
+.env.*
+!.env.example
+
+# ----------------------
+# Node.js dependencies
+# ----------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ----------------------
+# config files
+# ----------------------
+dist/
+build/
+*.tsbuildinfo
+
+# ----------------------
+# IDE files
+# ----------------------
+.DS_Store
+Thumbs.db

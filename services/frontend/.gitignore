@@ -1,0 +1,33 @@
+# ----------------------
+
+# ----------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ----------------------
+
+# ----------------------
+dist/
+dist-ssr/
+*.local
+
+# ----------------------
+
+# ----------------------
+.env
+.env.*
+!.env.example
+
+# ----------------------
+
+# ----------------------
+.idea/
+.DS_Store
+*.suo
+*.ntvs
+*.njsproj
+*.sln
+*.sw?

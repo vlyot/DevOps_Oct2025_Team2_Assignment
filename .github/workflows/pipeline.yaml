@@ -280,10 +280,79 @@ jobs:
             sast-report.sarif
           retention-days: 30
 
+  # --- DAST: Dynamic Application Security Testing ---
+  dast-scan:
+    runs-on: ubuntu-latest
+    needs: devsecops-pipeline
+    if: github.event_name == 'pull_request'  # Only on PRs to save resources
+
+    steps:
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. Install Auth Service Dependencies
+        working-directory: ./services/auth
+        run: npm install
+
+      - name: 4. Start Auth Service
+        working-directory: ./services/auth
+        run: |
+          echo "🚀 Starting auth service for DAST scanning..."
+          # Create temporary .env file with dummy values
+          cat > .env << EOF
+          SUPABASE_URL=https://dummy.supabase.co
+          SUPABASE_ANON_KEY=dummy-key-for-scanning
+          JWT_SECRET=test-secret-for-dast-only
+          PORT=3000
+          EOF
+
+          # Start service in background
+          npm start &
+
+          # Wait for service to be ready
+          echo "⏳ Waiting for service to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+              echo "✅ Auth service is ready!"
+              break
+            fi
+            echo "Attempt $i/30 - Service not ready yet..."
+            sleep 2
+          done
+
+          # Verify service is running
+          curl http://localhost:3000/health || echo "⚠️ Service might not be ready"
+
+      - name: 5. Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j'  # -a = AJAX spider, -j = JSON report
+          fail_action: false  # Don't fail build, just report findings
+          artifact_name: 'zap-scan-results'
+          issue_title: 'DAST Security Scan Results'
+
+      - name: 6. Upload DAST Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dast-security-reports
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 30
+
   # --- PIPELINE SUMMARY ---
   pipeline-summary:
     runs-on: ubuntu-latest
-    needs: [devsecops-pipeline, sast-scan]
+    needs: [devsecops-pipeline, sast-scan, dast-scan]
     if: always()
     
     steps:
@@ -307,6 +376,7 @@ jobs:
           echo "- ✅ **Code Quality** (ESLint) - All services" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Dependency Scan** (SCA/NPM Audit) - All services" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Static Analysis** (SAST/Semgrep) - Full codebase" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Dynamic Analysis** (DAST/OWASP ZAP) - Runtime security" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Unit Tests** - All services with tests" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Artifacts Generated" >> $GITHUB_STEP_SUMMARY
@@ -317,6 +387,7 @@ jobs:
           echo "- **devsecops-reports-api** - ESLint, SCA, Test Coverage" >> $GITHUB_STEP_SUMMARY
           echo "- **devsecops-reports-user** - ESLint, SCA, Test Coverage" >> $GITHUB_STEP_SUMMARY
           echo "- **sast-reports-all-services** - Semgrep SAST HTML, JSON, SARIF" >> $GITHUB_STEP_SUMMARY
+          echo "- **dast-security-reports** - OWASP ZAP HTML, JSON, Markdown" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔍 Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. Check the **Security tab** for SARIF findings" >> $GITHUB_STEP_SUMMARY
