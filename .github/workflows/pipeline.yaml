@@ -284,7 +284,8 @@ jobs:
   dast-scan:
     runs-on: ubuntu-latest
     needs: devsecops-pipeline
-    if: github.event_name == 'pull_request'  # Only on PRs to save resources
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/devops/pipeline'
+    # if: github.event_name == 'pull_request'
 
     steps:
       - name: 1. Checkout Code
