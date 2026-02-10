@@ -1,0 +1,24 @@
+# ZAP Scanning Rules
+# Format: RULE_ID	THRESHOLD	[IGNORE/WARN/FAIL]
+10010	MEDIUM	WARN	# Cookie No HttpOnly Flag
+10011	LOW	WARN	# Cookie Without Secure Flag
+10015	MEDIUM	WARN	# Re-examine Cache-control Directives
+10017	MEDIUM	WARN	# Cross-Domain JavaScript Source File Inclusion
+10019	MEDIUM	WARN	# Content-Type Header Missing
+10020	MEDIUM	WARN	# X-Frame-Options Header Not Set
+10021	MEDIUM	WARN	# X-Content-Type-Options Header Missing
+10023	MEDIUM	WARN	# Information Disclosure - Debug Error Messages
+10027	MEDIUM	WARN	# Information Disclosure - Suspicious Comments
+10032	MEDIUM	WARN	# Viewstate
+10037	MEDIUM	WARN	# Server Leaks Information via "X-Powered-By"
+10038	MEDIUM	WARN	# Content Security Policy (CSP) Header Not Set
+10040	MEDIUM	WARN	# Secure Pages Include Mixed Content
+10054	MEDIUM	WARN	# Cookie Without SameSite Attribute
+10055	MEDIUM	WARN	# CSP: Wildcard Directive
+10056	MEDIUM	WARN	# CSP: script-src unsafe-inline
+10063	MEDIUM	WARN	# Feature Policy Header Not Set
+10096	MEDIUM	WARN	# Timestamp Disclosure
+10098	MEDIUM	WARN	# Cross-Domain Misconfiguration
+10105	MEDIUM	WARN	# Weak Authentication Method
+10109	MEDIUM	WARN	# Modern Web Application
+10202	MEDIUM	WARN	# Absence of Anti-CSRF Tokens
