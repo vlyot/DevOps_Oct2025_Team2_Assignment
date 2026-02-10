@@ -1,80 +1,71 @@
 import type { User } from '../types/user';
-import { supabase } from '../../supabaseClient.ts';
-
-interface Todo {
-    id: number;
-    task: string;
-    completed: boolean;
-}
-
+import { supabase } from '../../supabaseClient';
 
 // Fetch all users
 export async function fetchUsers(): Promise<User[]> {
-    const { data, error } = await supabase.from<'users', User>('users').select('*');
+    const { data, error } = await supabase
+        .from('users')
+        .select('*');
+
     if (error) {
-        console.error('Error fetching users:', error);
+        // console.error('Error fetching users:', error);
         return [];
     }
 
-    return data || [];
+    return data as User[] ?? [];
 }
 
-const DEFAULT_PASSWORD_HASH = 'qwertyuiop';
-
-// Create new user
 export async function createUser(payload: {
     email: string;
     full_name?: string;
-    role: 'ADMIN' | 'USER';
-}): Promise<void> {
-    const { error } = await supabase.from('users').insert([
-        {
-            email: payload.email,
-            full_name: payload.full_name || null,
-            role: payload.role,
-            password_hash: DEFAULT_PASSWORD_HASH,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            last_login: null
-        },
-    ]);
+    password: string;
+    role: 'admin' | 'user';
+    }): Promise<void> {
+    try {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: payload.email,
+        password: payload.password,
+        });
 
+        if (authError || !authData.user) {
+        throw new Error('Failed to create auth user');
+        }
 
+        const userId = authData.user.id;
 
-    if (error) {
-        console.error('Error creating user:', error);
-        throw new Error('Failed to create user');
-    }
-}
-
-
-// Soft delete user
-export async function deactivateUser(userId: string): Promise<void> {
-    const { error } = await supabase
+        const { error: insertError } = await supabase
         .from('users')
-        .update({
-            is_active: false,
-            updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
+        .insert({
+            id: userId,
+            email: payload.email,
+            full_name: payload.full_name ?? null,
+            role: payload.role,
+            is_active: true,
+        });
 
-    if (error) {
-        console.error('Error deactivating user:', error);
-        throw new Error('Failed to deactivate user');
+        if (insertError) {
+        throw new Error('Failed to create user in public.users');
+        }
+    } catch (err) {
+        throw err;
     }
 }
 
-
-
-// Fetch todos
-export async function fetchTodos(): Promise<Todo[]> {
-    const { data, error } = await supabase.from<'todos', Todo>('todos').select('*');
+// Deactive user
+// Currently, deleting user from this side of code requires supabase paid plan, so this is the current alternative
+export async function deactivateUser(userId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({
+        is_active: false,
+      })
+      .eq('id', userId);
 
     if (error) {
-        console.error('Error fetching todos:', error);
-        return [];
+      throw new Error('Failed to deactivate user');
     }
-
-    return data || [];
+  } catch (err) {
+    throw err;
+  }
 }

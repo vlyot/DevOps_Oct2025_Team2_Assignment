@@ -26,7 +26,7 @@ export function UserTable({ users, onDeactivate }: Props) {
                 <td>{user.role}</td>
                 <td>{user.is_active ? 'Active' : 'Inactive'}</td>
                 <td>
-                {user.is_active && user.role !== 'ADMIN' && (
+                {user.is_active && user.role !== 'admin' && (
                     <button onClick={() => onDeactivate(user.id)}>
                     Deactivate
                     </button>

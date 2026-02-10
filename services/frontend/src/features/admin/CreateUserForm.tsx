@@ -1,53 +1,94 @@
 import { useState } from 'react';
+import lock_icon from '../../assets/lock.png';
+import gmail_icon from '../../assets/gmail.png';
+import user_icon from "../../assets/user.png";
 
 interface Props {
-    onCreate: (
-        email: string,
-        full_name: string | undefined,
-        role: 'ADMIN' | 'USER'
-    ) => void;
+  onCreate: (payload: {
+    email: string;
+    full_name?: string;
+    password: string;
+    role: 'admin' | 'user';
+  }) => void;
 }
 
 export function CreateUserForm({ onCreate }: Props) {
     const [email, setEmail] = useState('');
     const [fullName, setFullName] = useState('');
-    const [role, setRole] = useState<'ADMIN' | 'USER'>('USER');
-
+    const [password, setPassword] = useState('');
+    const [role, setRole] = useState<'admin' | 'user'>('user');
+    const [showCreateOverlay, setShowCreateOverlay] = useState(false);
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        onCreate(email, fullName || undefined, role);
+        if (!password) {
+        alert('Password is required');
+        return;
+        }
+
+        onCreate({
+        email,
+        full_name: fullName || undefined,
+        password,
+        role,
+        });
+
+        // Reset form
         setEmail('');
         setFullName('');
-        setRole('USER');
+        setPassword('');
+        setRole('user');
+        setShowCreateOverlay(false);
     }
 
     return (
-        <form onSubmit={submit}>
-        <h2>Create User</h2>
+        <form className="create-user-form" onSubmit={submit}>
+            <h2>Create a new user</h2>
+            <label>Username</label>
+            <div style={{ position: 'relative' }}>
+                <span className="input-icon"><img src={user_icon}></img></span>
+                <input
+                required
+                type="username"
+                placeholder="Username"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                />
+            </div>
+            <label>Password</label>
+            <div style={{ position: 'relative' }}>
+                <span className="input-icon"><img src={lock_icon}></img></span>
+                <input
+                required
+                type="password"
+                placeholder="User Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                />
+            </div>
+            <label>Email</label>
+            <div style={{ position: 'relative' }}>
+                <span className="input-icon"><img src={gmail_icon}></img></span>
+                <input
+                required
+                type="email"
+                placeholder="Email address"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                />
+            </div>
+            <label>Role</label>
+            <select
+                value={role}
+                onChange={e => setRole(e.target.value as 'admin' | 'user')}
+                >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                </select>
+            <p style={{ fontSize: '12px', color: '#9ca3af' }}>
+                A confirmation email will be sent when creating a user via this form.
+            </p>
 
-        <input
-            required
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-        />
-
-        <input
-            placeholder="Full name"
-            value={fullName}
-            onChange={e => setFullName(e.target.value)}
-        />
-
-        <select
-            value={role}
-            onChange={e => setRole(e.target.value as 'ADMIN' | 'USER')}
-        >
-            <option value="USER">User</option>
-            <option value="ADMIN">Admin</option>
-        </select>
-
-        <button type="submit">Create</button>
+            <button type="submit">Create user</button>
         </form>
     );
 }

@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 supabaseClient.ts
+# Frontend environment files
+.env
+.env.local
+.env.*.local
