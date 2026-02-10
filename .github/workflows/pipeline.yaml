@@ -2,7 +2,7 @@ name: DevSecOps Multi-Service Pipeline
 
 on:
   push:
-    branches: [ "develop", "main" ]
+    branches: [ "develop", "main" , "devops/pipeline" ]
   pull_request:
     branches: [ "develop", "main" ]
 
