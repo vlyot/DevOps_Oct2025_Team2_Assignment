@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { supabase } from './lib/supabase';
 import jwt from 'jsonwebtoken';
 import {authorize} from "./middleware/authMiddleware";
@@ -43,6 +43,11 @@ app.get('/admin/users', authorize('admin'), (req, res) => {
 
 app.get('/dashboard/files', authorize('user'), (req, res) => {
     res.json({ message: "this is your personal document list" });
+});
+
+// Health check endpoint for DAST scanning
+app.get('/health', (_req: Request, res: Response) => {
+    res.status(200).json({ status: 'healthy', service: 'auth' });
 });
 
 const PORT = process.env.PORT || 3000;
