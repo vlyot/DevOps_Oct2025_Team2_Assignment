@@ -8,7 +8,7 @@ on:
 
 permissions:
   security-events: write  # Required to upload SARIF results
-  contents: read          # Required to checkout code
+  contents: write          # Required to checkout code
 
 jobs:
   devsecops-pipeline:
@@ -393,3 +393,43 @@ jobs:
           echo "1. Check the **Security tab** for SARIF findings" >> $GITHUB_STEP_SUMMARY
           echo "2. Download artifacts to review detailed HTML reports" >> $GITHUB_STEP_SUMMARY
           echo "3. Address any HIGH/CRITICAL vulnerabilities before merging" >> $GITHUB_STEP_SUMMARY
+
+
+   # --- THE QA GATE: Only triggers on your branch for testing ---
+  create-release-candidate:
+    runs-on: ubuntu-latest
+    needs: [pipeline-summary]
+    # This ensures no one else sees "Drafts" until you're ready to merge to develop
+    if: github.ref == 'refs/heads/devops/pipeline'
+    
+    steps:
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 2. Generate Version String
+        id: version
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "rc_version=v0.0.0-rc.${TIMESTAMP}.${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: 3. Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.rc_version }}
+          draft: true
+          name: "📦 QA Candidate: ${{ steps.version.outputs.rc_version }}"
+          body: |
+            ## 🛡️ QA Security & Build Package
+            **Branch:** `${{ github.ref_name }}`
+            **Commit:** `${{ github.sha }}`
+            
+            ### ✅ Verification Checklist
+            - [x] **Matrix:** All 5 services built successfully
+            - [x] **SAST:** Semgrep completed (See Security Tab)
+            - [x] **DAST:** ZAP Baseline Scan completed
+            - [x] **SCA:** NPM Audit completed for all services
+            
+            **QA Action:** Review the artifacts in the Actions tab. If the build meets quality standards, click **Publish Release** to finalize this version.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
