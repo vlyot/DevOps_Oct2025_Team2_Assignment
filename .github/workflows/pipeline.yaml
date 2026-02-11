@@ -333,7 +333,7 @@ jobs:
           curl http://localhost:3000/health || echo "⚠️ Service might not be ready"
 
       - name: 6. Run OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
+        uses: zaproxy/action-baseline@v0.14.0
         with:
           target: 'http://localhost:3000'
           rules_file_name: '.zap/rules.tsv'
