@@ -7,11 +7,17 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import validator from 'validator';
 import { validateEnvironment } from './config/validateEnv';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
+import { swaggerOptions } from './config/swagger';
 
 // Validate environment variables on startup
 validateEnvironment();
 
 const app = express();
+
+// Generate Swagger specification
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 // Security headers
 app.use(helmet({
@@ -33,6 +39,18 @@ app.use(helmet({
 app.use(cors());
 app.use(express.json());
 
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'DevSecOps Auth API'
+}));
+
+// Swagger JSON spec endpoint
+app.get('/api-docs.json', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+});
+
 // Rate limiter for login attempts
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -44,6 +62,40 @@ const loginLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Authenticate user and receive JWT token
+ *     description: Authenticates a user with email and password, returns JWT token valid for 8 hours. Rate limited to 5 attempts per 15 minutes per IP.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Successful authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         description: Too many login attempts (rate limited - 5 attempts per 15 minutes)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *     security: []
+ */
 app.post('/login', loginLimiter, async (req, res) => {
     const { email, password } = req.body;
 
@@ -114,7 +166,29 @@ app.post('/login', loginLimiter, async (req, res) => {
 // ADMIN USER MANAGEMENT ENDPOINTS
 // ============================================
 
-// Get all users (admin only)
+/**
+ * @swagger
+ * /admin/users:
+ *   get:
+ *     summary: Get all users (admin only)
+ *     description: Retrieves a list of all users with their roles and metadata. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UsersListResponse'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 app.get('/admin/users', authorize('admin'), async (req, res) => {
     try {
         // Get users from Supabase auth
@@ -154,7 +228,37 @@ app.get('/admin/users', authorize('admin'), async (req, res) => {
     }
 });
 
-// Create new user (admin only)
+/**
+ * @swagger
+ * /admin/users:
+ *   post:
+ *     summary: Create new user (admin only)
+ *     description: Creates a new user with specified email, password, and role. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateUserRequest'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CreateUserResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 app.post('/admin/users', authorize('admin'), async (req, res) => {
     try {
         const { email, password, role } = req.body;
@@ -228,7 +332,43 @@ app.post('/admin/users', authorize('admin'), async (req, res) => {
     }
 });
 
-// Delete user (admin only)
+/**
+ * @swagger
+ * /admin/users/{id}:
+ *   delete:
+ *     summary: Delete user (admin only)
+ *     description: Deletes a user by ID. Admin cannot delete their own account. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID to delete
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DeleteUserResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Forbidden - cannot delete own account or insufficient permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 app.delete('/admin/users/:id', authorize('admin'), async (req, res) => {
     try {
         const id = req.params.id;
@@ -275,7 +415,45 @@ app.delete('/admin/users/:id', authorize('admin'), async (req, res) => {
     }
 });
 
-// Update user role (admin only)
+/**
+ * @swagger
+ * /admin/users/{id}/role:
+ *   patch:
+ *     summary: Update user role (admin only)
+ *     description: Updates a user's role to either admin or user. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateRoleRequest'
+ *     responses:
+ *       200:
+ *         description: User role updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UpdateRoleResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 app.patch('/admin/users/:id/role', authorize('admin'), async (req, res) => {
     try {
         const id = req.params.id;
@@ -317,11 +495,47 @@ app.patch('/admin/users/:id/role', authorize('admin'), async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /dashboard/files:
+ *   get:
+ *     summary: Get user's personal document list
+ *     description: Retrieves the authenticated user's personal document list. Requires user or admin authorization.
+ *     tags: [User Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User's document list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DashboardResponse'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
 app.get('/dashboard/files', authorize('user'), (req, res) => {
     res.json({ message: "this is your personal document list" });
 });
 
-// Health check endpoint for DAST scanning
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Returns the health status of the auth service. Used for monitoring and DAST scanning.
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthResponse'
+ *     security: []
+ */
 app.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({ status: 'healthy', service: 'auth' });
 });
