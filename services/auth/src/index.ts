@@ -76,7 +76,7 @@ app.post('/login', loginLimiter, async (req, res) => {
     }
 
     const { data: profile } = await supabase
-        .from('profiles')
+        .from('users')
         .select('role')
         .eq('id', data.user.id)
         .single();
