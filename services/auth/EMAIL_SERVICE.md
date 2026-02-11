@@ -20,15 +20,13 @@ Add these variables to your `services/auth/.env` file:
 ```env
 # Email Service Configuration
 EMAIL_ENABLED=true
-EMAIL_FROM_NAME=DevSecOps Platform
+EMAIL_FROM=onboarding@resend.dev
 ADMIN_NOTIFICATION_EMAIL=s10259894A@connect.np.edu.sg
 
-# Gmail SMTP Configuration (Free Tier)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-gmail@gmail.com
-SMTP_PASS=your-gmail-app-password
+# Resend API Configuration (Free Tier: 3,000 emails/month)
+# Sign up at: https://resend.com/signup
+# Get your API key from: https://resend.com/api-keys
+RESEND_API_KEY=re_your_api_key_here
 
 # Email Feature Flags
 SEND_CREATE_EMAIL=true
@@ -37,41 +35,36 @@ SEND_UPDATE_EMAIL=true
 SEND_DELETE_EMAIL=true
 ```
 
-### Gmail Setup (Free Tier)
+### Resend Setup (Free Tier - Recommended)
 
-1. **Enable 2-Factor Authentication** on your Gmail account:
-   - Go to [Google Account Security](https://myaccount.google.com/security)
-   - Enable 2-Step Verification
+**Why Resend?**
+- ✅ 3,000 emails per month free
+- ✅ Simple API key setup (no SMTP configuration)
+- ✅ Excellent deliverability
+- ✅ No Gmail account or 2FA required
 
-2. **Generate an App Password**:
-   - Go to [App Passwords](https://myaccount.google.com/apppasswords)
-   - Select "Mail" and "Other (Custom name)"
+**Setup Steps:**
+
+1. **Sign up for Resend**:
+   - Go to [https://resend.com/signup](https://resend.com/signup)
+   - Create an account (free)
+
+2. **Get your API Key**:
+   - After login, go to [API Keys](https://resend.com/api-keys)
+   - Click "Create API Key"
    - Name it "DevSecOps Platform"
-   - Copy the 16-character password
+   - Copy the API key (starts with `re_`)
 
 3. **Update Environment Variables**:
    ```env
-   SMTP_USER=your-email@gmail.com
-   SMTP_PASS=xxxx xxxx xxxx xxxx  # The 16-character app password
+   RESEND_API_KEY=re_your_actual_api_key_here
+   EMAIL_FROM=onboarding@resend.dev
    ```
 
-### Alternative SMTP Providers
-
-#### SendGrid (Free Tier: 100 emails/day)
-```env
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_USER=apikey
-SMTP_PASS=your-sendgrid-api-key
-```
-
-#### AWS SES (Very cheap: $0.10 per 1000 emails)
-```env
-SMTP_HOST=email-smtp.us-east-1.amazonaws.com
-SMTP_PORT=587
-SMTP_USER=your-aws-smtp-username
-SMTP_PASS=your-aws-smtp-password
-```
+**Important Notes:**
+- Use `onboarding@resend.dev` for testing (Resend's test domain)
+- For production, add and verify your own domain in Resend dashboard
+- Free tier includes 3,000 emails/month, 100 emails/day
 
 ## Email Templates
 
@@ -127,11 +120,12 @@ curl -X DELETE http://localhost:3000/admin/users/email/user@example.com \
 ## Testing
 
 ### Manual Testing
-1. Configure Gmail credentials in `.env`:
+1. Configure Resend API key in `.env`:
    ```env
    EMAIL_ENABLED=true
-   SMTP_USER=your-gmail@gmail.com
-   SMTP_PASS=your-app-password
+   EMAIL_FROM=onboarding@resend.dev
+   ADMIN_NOTIFICATION_EMAIL=s10259894A@connect.np.edu.sg
+   RESEND_API_KEY=re_your_actual_api_key_here
    ```
 
 2. Start auth service:
@@ -143,10 +137,16 @@ curl -X DELETE http://localhost:3000/admin/users/email/user@example.com \
 3. Look for email service status in logs:
    ```
    🚀 Back to basics on port 3000
-   📧 Email service ready
+   [Email] Resend initialized
    ```
 
-4. Create a test user and check your inbox at `s10259894A@connect.np.edu.sg`
+4. Create a test user and check your inbox at `s10259894A@connect.np.edu.sg`:
+   ```bash
+   curl -X POST http://localhost:3000/admin/users \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"test@example.com","password":"test123","role":"user"}'
+   ```
 
 ### Unit Testing
 ```bash
@@ -164,44 +164,37 @@ Tests cover:
 ## Troubleshooting
 
 ### Email service disabled
-**Symptom**: Log shows "📧 Email service disabled"
+**Symptom**: Log shows "Email service disabled"
 **Solution**: Set `EMAIL_ENABLED=true` in `.env`
 
-### Connection failed
-**Symptom**: Log shows "⚠️ Email service configured but connection failed"
-**Possible Causes**:
-1. Invalid SMTP credentials
-2. 2FA not enabled on Gmail (required for app passwords)
-3. Firewall blocking port 587
-4. Incorrect SMTP host/port
-
+### Resend API key missing
+**Symptom**: Log shows "EMAIL_ENABLED is true but RESEND_API_KEY is missing"
 **Solution**:
-```bash
-# Test SMTP connection manually
-node -e "
-const nodemailer = require('nodemailer');
-const transport = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  auth: { user: 'your@gmail.com', pass: 'your-app-password' }
-});
-transport.verify().then(console.log).catch(console.error);
-"
-```
+1. Get API key from [https://resend.com/api-keys](https://resend.com/api-keys)
+2. Add to `.env` file: `RESEND_API_KEY=re_your_key_here`
 
 ### Emails not received
 **Check**:
 1. Spam folder at `s10259894A@connect.np.edu.sg`
-2. Server logs for email sending confirmation
+2. Server logs for email sending confirmation: `[Email] Sent successfully: <message-id>`
 3. Feature flags are enabled (e.g., `SEND_CREATE_EMAIL=true`)
-4. Gmail daily sending limit (500 emails/day)
+4. Resend API key is valid and not expired
+5. Check Resend dashboard for email delivery status
+
+### API Key invalid
+**Symptom**: Error message about invalid API key
+**Solution**:
+1. Verify API key starts with `re_`
+2. Check for extra spaces or quotes in `.env` file
+3. Create a new API key if old one was deleted
 
 ### Rate Limiting
-Gmail free tier has rate limits:
-- 500 emails per day
-- 500 recipients per day
+Resend free tier limits:
+- 3,000 emails per month
+- 100 emails per day
+- 1 email per second
 
-**Solution**: Use AWS SES or SendGrid for production
+**Solution**: Monitor usage in Resend dashboard, upgrade to paid plan if needed
 
 ## Docker Deployment
 
@@ -254,13 +247,13 @@ docker logs devsecops-auth
          └────────┬─────────┘
                   │
          ┌────────▼─────────┐
-         │   Nodemailer     │
-         │   (SMTP Client)  │
+         │   Resend API     │
+         │   (REST Client)  │
          └────────┬─────────┘
                   │
          ┌────────▼─────────┐
-         │   Gmail SMTP     │
-         │  smtp.gmail.com  │
+         │  Resend Service  │
+         │  resend.com      │
          └────────┬─────────┘
                   │
          ┌────────▼─────────┐
@@ -294,11 +287,12 @@ Monitor email service health:
 
 This implementation completes:
 - **SCRUM-55**: Setup Email Notification Service
-  - ✅ Nodemailer integration
-  - ✅ Gmail SMTP configuration
+  - ✅ Resend API integration
+  - ✅ Simple API key configuration (no SMTP setup)
   - ✅ Four email templates (CREATE/READ/UPDATE/DELETE)
   - ✅ Integration with all admin endpoints
   - ✅ Feature flags for granular control
   - ✅ Unit tests (13+ passing tests)
   - ✅ Docker support
   - ✅ Comprehensive documentation
+  - ✅ Free tier: 3,000 emails/month
