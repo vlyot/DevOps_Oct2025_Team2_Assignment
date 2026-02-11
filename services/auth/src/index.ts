@@ -9,6 +9,7 @@ import validator from "validator";
 import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./config/swagger";
+import { emailService } from "./services/emailService";
 
 dotenv.config();
 
@@ -194,6 +195,15 @@ app.post("/admin/users", requireAuth, async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
 
+  // Send user created email notification
+  if (process.env.SEND_CREATE_EMAIL === "true") {
+    emailService
+      .sendUserCreatedEmail(email, role || "user")
+      .catch((err) =>
+        console.error("[Email] Failed to send user created email:", err)
+      );
+  }
+
   return res.status(201).json({
     id: data.user?.id,
     email: email,
@@ -271,6 +281,17 @@ app.get("/admin/users", requireAuth, async (req, res) => {
   }));
 
   console.log(`✅ Successfully fetched ${users.length} users.`);
+
+  // Send read email notification for audit trail
+  if (process.env.SEND_READ_EMAIL === "true") {
+    const requesterEmail = (req as any).user?.email || "admin@system";
+    emailService
+      .sendUserReadEmail(requesterEmail)
+      .catch((err) =>
+        console.error("[Email] Failed to send user read email:", err)
+      );
+  }
+
   return res.status(200).json(users);
 });
 
@@ -318,7 +339,7 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
   if (requesterRole !== "admin") {
     return res.status(403).json({ error: "Access denied: Admins only" });
   }
-  const { email } = req.params;
+  const email = Array.isArray(req.params.email) ? req.params.email[0] : req.params.email;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   const supabaseAdmin = createClient(
@@ -338,6 +359,15 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
 
     if (!userToDelete) {
       return res.status(404).json({ error: "User with this email not found" });
+    }
+
+    // Send deletion email BEFORE deleting user
+    if (process.env.SEND_DELETE_EMAIL === "true") {
+      await emailService
+        .sendUserDeletedEmail(email)
+        .catch((err) =>
+          console.error("[Email] Failed to send user deleted email:", err)
+        );
     }
 
     // 2. Delete the user using the UUID we just found
@@ -398,7 +428,7 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
  */
 // UPDATE route - Change a user's role
 app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
-  const { email } = req.params;
+  const email = Array.isArray(req.params.email) ? req.params.email[0] : req.params.email;
   const { role } = req.body; // e.g., { "role": "admin" }
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -421,12 +451,22 @@ app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
     }
 
     // 2. Update the metadata using the ID we found
+    const oldRole = userToUpdate.user_metadata?.role || "user";
     const { data: updatedData, error: updateError } =
       await supabaseAdmin.auth.admin.updateUserById(userToUpdate.id, {
         user_metadata: { role: role },
       });
 
     if (updateError) throw updateError;
+
+    // Send role updated email notification
+    if (process.env.SEND_UPDATE_EMAIL === "true") {
+      emailService
+        .sendUserUpdatedEmail(email, oldRole, role)
+        .catch((err) =>
+          console.error("[Email] Failed to send user updated email:", err)
+        );
+    }
 
     return res.status(200).json({
       message: `Role for ${email} updated to ${role}`,
@@ -463,4 +503,18 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "healthy", service: "auth" });
 });
 
-app.listen(3000, () => console.log("🚀 Back to basics on port 3000"));
+app.listen(3000, async () => {
+  console.log("🚀 Back to basics on port 3000");
+
+  // Verify email service connection
+  if (process.env.EMAIL_ENABLED === "true") {
+    const emailReady = await emailService.verifyConnection();
+    if (emailReady) {
+      console.log("📧 Email service ready");
+    } else {
+      console.warn("⚠️  Email service configured but connection failed");
+    }
+  } else {
+    console.log("📧 Email service disabled");
+  }
+});

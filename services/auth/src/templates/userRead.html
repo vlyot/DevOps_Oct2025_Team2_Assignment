@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>User Account Accessed</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #cce5ff; padding: 20px; border-radius: 5px; border-left: 4px solid #007bff;">
+    <h1 style="color: #004085;">📖 User Account Accessed</h1>
+    <p>Hello Administrator,</p>
+    <p>A user account has been accessed on the DevSecOps Platform.</p>
+
+    <div style="background-color: #ffffff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <p style="margin: 5px 0;"><strong>Action:</strong> <span style="color: #007bff; font-weight: bold;">{{action}}</span></p>
+      <p style="margin: 5px 0;"><strong>Email:</strong> {{email}}</p>
+      <p style="margin: 5px 0;"><strong>Timestamp:</strong> <script>document.write(new Date().toLocaleString())</script></p>
+    </div>
+
+    <p>This notification is sent when an administrator reads or queries user information.</p>
+
+    <hr style="border: 1px solid #ddd; margin: 20px 0;">
+    <p style="color: #666; font-size: 12px;">
+      This is an automated notification from DevSecOps Platform. Please do not reply to this email.
+    </p>
+  </div>
+</body>
+</html>
