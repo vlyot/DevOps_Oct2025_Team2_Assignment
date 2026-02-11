@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminDashboard } from '../features/admin/AdminDashboard';
 import { supabase } from '../../supabaseClient';
 
 const TEMP_ADMIN_EMAIL = import.meta.env.VITE_TEMP_ADMIN_EMAIL as string;
 const TEMP_ADMIN_PASSWORD = import.meta.env.VITE_TEMP_ADMIN_PASSWORD as string;
 
-export default function App() {
+export default function AdminPage() {
     const [loading, setLoading] = useState(true);
     const [isAuthed, setIsAuthed] = useState(false);
     const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
@@ -27,10 +26,10 @@ export default function App() {
         } = await supabase.auth.getSession();
 
         if (session) {
-        setIsAuthed(true);
-        const role = await getRole(session.user.id);
-        setUserRole(role);
-        setLoading(false);
+            setIsAuthed(true);
+            const role = await getRole(session.user.id);
+            setUserRole(role);
+            setLoading(false);
         return;
         }
         const isTest = true;
@@ -44,6 +43,7 @@ export default function App() {
             setIsAuthed(true);
         }
         }
+        
 
         setLoading(false);
     }
@@ -62,16 +62,14 @@ export default function App() {
     }
 
     if (loading) {
-        return <p>Initializing session...</p>;
+        return <p className="main-page">Initializing session...</p>;
     }
 
+    if (userRole != "admin"){
+        return <p className="main-page">No access</p>;
+    }
     return (
-        <Routes>
-        <Route
-            path="/admin"
-            element={isAuthed ? <AdminDashboard /> : <Navigate to="/" replace />}
-        />
-        <Route path="/" element={<Navigate to="/admin" replace />} />
-        </Routes>
+        <AdminDashboard>
+        </AdminDashboard>
     );
 }

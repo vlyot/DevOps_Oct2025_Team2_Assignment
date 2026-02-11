@@ -60,7 +60,7 @@ export function AdminDashboard() {
         )
         );
     }
-
+    
     if (loading) return <p className="loading">Loading users...</p>;
     const activeUsers = users.filter(u => u.is_active);
     const normalUsers = activeUsers.filter(u => u.role === 'user').length;
@@ -68,18 +68,18 @@ export function AdminDashboard() {
     const totalUsers = activeUsers.length;
     
     return (
-        <div className="admin-page">
+        <div className="main-page">
             {error && <div className="error">Unable to load users</div>}
             {showCreateOverlay && (
                 <div className="overlay">
                 <div className="overlay-content">
                     <button
-                    className="close-btn"
-                    onClick={() => setShowCreateOverlay(false)}
+                        className="close-btn"
+                        onClick={() => setShowCreateOverlay(false)}
                     >
                     x
                     </button>
-                    <CreateUserForm onCreate={handleCreate} />
+                    <CreateUserForm onCreate={handleCreate} onClose={() => setShowCreateOverlay(false)} />
                 </div>
                 </div>
             )}

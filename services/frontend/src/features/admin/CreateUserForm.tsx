@@ -10,26 +10,26 @@ interface Props {
     password: string;
     role: 'admin' | 'user';
   }) => void;
+  onClose: () => void;
 }
 
-export function CreateUserForm({ onCreate }: Props) {
+export function CreateUserForm({ onCreate, onClose }: Props) {
     const [email, setEmail] = useState('');
     const [fullName, setFullName] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<'admin' | 'user'>('user');
-    const [showCreateOverlay, setShowCreateOverlay] = useState(false);
     function submit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!password) {
-        alert('Password is required');
+            e.preventDefault();
+            if (!password) {
+            alert('Password is required');
         return;
         }
 
         onCreate({
-        email,
-        full_name: fullName || undefined,
-        password,
-        role,
+            email,
+            full_name: fullName || undefined,
+            password,
+            role,
         });
 
         // Reset form
@@ -37,7 +37,8 @@ export function CreateUserForm({ onCreate }: Props) {
         setFullName('');
         setPassword('');
         setRole('user');
-        setShowCreateOverlay(false);
+
+        onClose();
     }
 
     return (
@@ -75,7 +76,7 @@ export function CreateUserForm({ onCreate }: Props) {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 />
-            </div>
+                 </div>
             <label>Role</label>
             <select
                 value={role}

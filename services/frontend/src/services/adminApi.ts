@@ -42,9 +42,9 @@ export async function createUser(payload: {
             role: payload.role,
             is_active: true,
         });
-
         if (insertError) {
-        throw new Error('Failed to create user in public.users');
+            console.log(insertError)
+            throw new Error('Failed to create user in public.users');
         }
     } catch (err) {
         throw err;
@@ -55,16 +55,19 @@ export async function createUser(payload: {
 // Currently, deleting user from this side of code requires supabase paid plan, so this is the current alternative
 export async function deactivateUser(userId: string): Promise<void> {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('users')
       .update({
         is_active: false,
       })
-      .eq('id', userId);
-
+      .eq('id', userId)
+      .select('id, is_active');
+    
     if (error) {
       throw new Error('Failed to deactivate user');
     }
+    console.log("User " + userId + " deleted")
+    console.log(data)
   } catch (err) {
     throw err;
   }
