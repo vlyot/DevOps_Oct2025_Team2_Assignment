@@ -11,4 +11,3 @@ README.md
 Dockerfile*
 docker-compose*.yml
 jest.config.js
-tsconfig.json
