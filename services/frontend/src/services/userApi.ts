@@ -88,6 +88,35 @@ export async function createFile(file: File): Promise<void> {
 
 // Delete file
 export async function deleteFile(fileId: string): Promise<void> {
+    const userId = await getCurrentUserId();
 
+    const { data, error } = await supabase
+        .from('files')
+        .select('storage_path')
+        .eq('id', fileId)
+        .eq('user_id', userId)
+        .single();
+
+    if (error || !data) {
+        throw new Error('File not found');
+    }
+
+    const { error: storageError } = await supabase.storage
+        .from('user-files')
+        .remove([data.storage_path]);
+
+    if (storageError) {
+        throw new Error('Failed to delete file from storage');
+    }
+
+    const { error: deleteError } = await supabase
+        .from('files')
+        .delete()
+        .eq('id', fileId)
+        .eq('user_id', userId);
+
+    if (deleteError) {
+        throw new Error('Failed to delete file record');
+    }
 }
 
