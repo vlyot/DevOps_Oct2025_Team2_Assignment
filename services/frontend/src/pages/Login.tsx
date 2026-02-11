@@ -33,7 +33,7 @@ export default function Login() {
                 localStorage.setItem('role', data.role);
                 
                 // Navigate to dashboard
-                navigate('/dashboard');
+                navigate('/admin');
             } else {
                 setError(data.error || 'Login failed');
             }

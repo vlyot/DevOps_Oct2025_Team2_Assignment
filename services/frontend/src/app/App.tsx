@@ -1,34 +1,25 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AdminDashboard } from '../features/admin/AdminDashboard';
+import { AdminDashboard } from '../features/admin/AdminDashboard'; // Ensure this matches your export (named vs default)
 import Login from '../pages/Login';
 import UserDashboard from '../pages/UserDashboard';
-import ProtectedRoute from './routes/ProtectedRoute';
 
 export default function App() {
     return (
         <Routes>
+            {/* 1. Default route redirects to login */}
             <Route path="/" element={<Navigate to="/login" replace />} />
+            
+            {/* 2. Login Page - Always accessible */}
             <Route path="/login" element={<Login />} />
 
-            {/* User routes - require user role */}
-            <Route
-                path="/dashboard"
-                element={
-                    <ProtectedRoute requiredRole="user">
-                        <UserDashboard />
-                    </ProtectedRoute>
-                }
-            />
+            {/* 3. User Dashboard - Removed ProtectedRoute for testing */}
+            <Route path="/dashboard" element={<UserDashboard />} />
 
-            {/* Admin routes - require admin role */}
-            <Route
-                path="/admin"
-                element={
-                    <ProtectedRoute requiredRole="admin">
-                        <AdminDashboard />
-                    </ProtectedRoute>
-                }
-            />
+            {/* 4. Admin Dashboard - Removed ProtectedRoute for testing */}
+            <Route path="/admin" element={<AdminDashboard />} />
+            
+            {/* 5. Catch-all: redirect any unknown routes to login */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
     );
 }

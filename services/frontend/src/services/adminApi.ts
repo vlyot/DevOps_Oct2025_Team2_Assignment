@@ -1,4 +1,43 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Simple API service for Admin actions
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+export const createUser = async (userData: any) => {
+    console.log("Sending create request:", userData);
+    
+    const response = await fetch(`${API_URL}/admin/users`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // We are skipping the 'Authorization' header for now to keep it simple
+        },
+        body: JSON.stringify(userData),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.error || 'Failed to create user');
+    }
+    
+    return data;
+};
+
+// We can add getUsers() here later
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 interface User {
     id: string;
@@ -121,4 +160,4 @@ export async function updateUserRole(userId: string, role: 'admin' | 'user'): Pr
     }
 
     return response.json();
-}
+}*/
