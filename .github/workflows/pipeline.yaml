@@ -313,7 +313,7 @@ jobs:
           EOF
 
           # Start service in background
-          npx dev &
+          npx ts-node src/index.ts
 
           # Wait for service to be ready
           echo "⏳ Waiting for service to start..."
