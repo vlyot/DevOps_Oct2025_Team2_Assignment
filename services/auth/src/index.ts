@@ -9,6 +9,8 @@ import validator from "validator";
 import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./config/swagger";
+import { emailService } from "./services/emailService";
+import { subscriberRepository } from "./repositories/subscriberRepository";
 
 dotenv.config();
 
@@ -194,6 +196,15 @@ app.post("/admin/users", requireAuth, async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
 
+  // Send user created email notification
+  if (process.env.SEND_CREATE_EMAIL === "true") {
+    emailService
+      .sendUserCreatedEmail(email, role || "user")
+      .catch((err) =>
+        console.error("[Email] Failed to send user created email:", err)
+      );
+  }
+
   return res.status(201).json({
     id: data.user?.id,
     email: email,
@@ -271,6 +282,17 @@ app.get("/admin/users", requireAuth, async (req, res) => {
   }));
 
   console.log(`✅ Successfully fetched ${users.length} users.`);
+
+  // Send read email notification for audit trail
+  if (process.env.SEND_READ_EMAIL === "true") {
+    const requesterEmail = (req as any).user?.email || "admin@system";
+    emailService
+      .sendUserReadEmail(requesterEmail)
+      .catch((err) =>
+        console.error("[Email] Failed to send user read email:", err)
+      );
+  }
+
   return res.status(200).json(users);
 });
 
@@ -318,7 +340,7 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
   if (requesterRole !== "admin") {
     return res.status(403).json({ error: "Access denied: Admins only" });
   }
-  const { email } = req.params;
+  const email = Array.isArray(req.params.email) ? req.params.email[0] : req.params.email;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   const supabaseAdmin = createClient(
@@ -338,6 +360,15 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
 
     if (!userToDelete) {
       return res.status(404).json({ error: "User with this email not found" });
+    }
+
+    // Send deletion email BEFORE deleting user
+    if (process.env.SEND_DELETE_EMAIL === "true") {
+      await emailService
+        .sendUserDeletedEmail(email)
+        .catch((err) =>
+          console.error("[Email] Failed to send user deleted email:", err)
+        );
     }
 
     // 2. Delete the user using the UUID we just found
@@ -398,7 +429,7 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
  */
 // UPDATE route - Change a user's role
 app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
-  const { email } = req.params;
+  const email = Array.isArray(req.params.email) ? req.params.email[0] : req.params.email;
   const { role } = req.body; // e.g., { "role": "admin" }
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -421,12 +452,22 @@ app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
     }
 
     // 2. Update the metadata using the ID we found
+    const oldRole = userToUpdate.user_metadata?.role || "user";
     const { data: updatedData, error: updateError } =
       await supabaseAdmin.auth.admin.updateUserById(userToUpdate.id, {
         user_metadata: { role: role },
       });
 
     if (updateError) throw updateError;
+
+    // Send role updated email notification
+    if (process.env.SEND_UPDATE_EMAIL === "true") {
+      emailService
+        .sendUserUpdatedEmail(email, oldRole, role)
+        .catch((err) =>
+          console.error("[Email] Failed to send user updated email:", err)
+        );
+    }
 
     return res.status(200).json({
       message: `Role for ${email} updated to ${role}`,
@@ -463,4 +504,240 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "healthy", service: "auth" });
 });
 
-app.listen(3000, () => console.log("🚀 Back to basics on port 3000"));
+/**
+ * @swagger
+ * /subscribe:
+ *   post:
+ *     summary: Subscribe to email notifications
+ *     description: Subscribe an email address to receive notifications about all user CRUD operations. No authentication required.
+ *     tags: [Subscriptions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to subscribe
+ *                 example: user@example.com
+ *     responses:
+ *       201:
+ *         description: Successfully subscribed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Successfully subscribed to notifications
+ *                 email:
+ *                   type: string
+ *                   example: user@example.com
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *     security: []
+ */
+app.post("/subscribe", async (req, res) => {
+  const { email } = req.body;
+
+  // Validation
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  // Subscribe
+  const subscriber = await subscriberRepository.subscribe(email);
+
+  if (!subscriber) {
+    return res.status(500).json({ error: "Failed to subscribe" });
+  }
+
+  return res.status(201).json({
+    message: "Successfully subscribed to notifications",
+    email: subscriber.email,
+  });
+});
+
+/**
+ * @swagger
+ * /unsubscribe:
+ *   post:
+ *     summary: Unsubscribe from email notifications
+ *     description: Unsubscribe an email address from receiving notifications. No authentication required.
+ *     tags: [Subscriptions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to unsubscribe
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Successfully unsubscribed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Successfully unsubscribed from notifications
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *     security: []
+ */
+app.post("/unsubscribe", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  const success = await subscriberRepository.unsubscribe(email);
+
+  if (!success) {
+    return res.status(500).json({ error: "Failed to unsubscribe" });
+  }
+
+  return res.status(200).json({
+    message: "Successfully unsubscribed from notifications",
+  });
+});
+
+/**
+ * @swagger
+ * /subscribe/status:
+ *   get:
+ *     summary: Check subscription status
+ *     description: Check if an email is subscribed to notifications
+ *     tags: [Subscriptions]
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: Email address to check
+ *     responses:
+ *       200:
+ *         description: Subscription status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 subscribed:
+ *                   type: boolean
+ *                   example: true
+ *                 email:
+ *                   type: string
+ *                   example: user@example.com
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *     security: []
+ */
+app.get("/subscribe/status", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: "Email parameter is required" });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  const subscribed = await subscriberRepository.isSubscribed(email);
+
+  return res.status(200).json({
+    subscribed,
+    email,
+  });
+});
+
+/**
+ * @swagger
+ * /admin/subscribers:
+ *   get:
+ *     summary: Get all subscribers (admin only)
+ *     description: Retrieve a list of all email subscribers including inactive ones
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all subscribers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                     format: uuid
+ *                   email:
+ *                     type: string
+ *                   subscribed_at:
+ *                     type: string
+ *                     format: date-time
+ *                   is_active:
+ *                     type: boolean
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+app.get("/admin/subscribers", requireAuth, async (req, res) => {
+  const requesterRole = (req as any).user?.user_metadata?.role;
+  if (requesterRole !== "admin") {
+    return res.status(403).json({ error: "Access denied: Admins only" });
+  }
+
+  const subscribers = await subscriberRepository.getAllSubscribers();
+  return res.status(200).json(subscribers);
+});
+
+app.listen(3000, async () => {
+  console.log("🚀 Back to basics on port 3000");
+
+  // Verify email service connection
+  if (process.env.EMAIL_ENABLED === "true") {
+    const emailReady = await emailService.verifyConnection();
+    if (emailReady) {
+      console.log("📧 Email service ready");
+    } else {
+      console.warn("⚠️  Email service configured but connection failed");
+    }
+  } else {
+    console.log("📧 Email service disabled");
+  }
+});

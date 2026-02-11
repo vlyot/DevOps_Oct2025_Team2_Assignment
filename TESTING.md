@@ -1,9 +1,10 @@
 # Testing Guide
 
 ## Overview
-This project uses:
-- **Auth Service:** Jest + Supertest
-- **Frontend:** Vitest + React Testing Library
+This project uses multiple testing approaches:
+- **Unit Tests:** Jest (Auth Service) + Vitest (Frontend)
+- **BDD Tests:** Robot Framework for acceptance testing
+- **Integration Tests:** Supertest for API testing
 
 ## Running Tests
 
@@ -30,11 +31,20 @@ Current coverage targets: **60%** minimum
 
 ### Auth Service
 - Authorization middleware: **90%** coverage
-- 9 test cases covering all auth scenarios
+- API routes: **Comprehensive coverage** (login, admin endpoints, dashboard)
+- Supabase client: **Full initialization tests**
+- Total: 30+ test cases
 
 ### Frontend
 - Login component: **75%** coverage
-- 8 test cases covering UI and integration
+- AdminPage component: **Full coverage** (20+ test cases)
+- UserDashboard component: **Full coverage** (15+ test cases)
+- Total: 40+ test cases
+
+### BDD Tests (Robot Framework)
+- Authentication workflows: 10+ scenarios
+- Authorization tests: 4+ scenarios
+- Total: 15+ BDD acceptance tests
 
 ## Adding New Tests
 
@@ -51,9 +61,54 @@ Create files in `src/pages/__tests__/`:
 ```
 services/frontend/src/pages/__tests__/
 ├── Login.test.tsx
-├── AdminPage.test.tsx  (future)
-└── UserDashboard.test.tsx  (future)
+├── AdminPage.test.tsx
+└── UserDashboard.test.tsx
 ```
+
+## BDD Testing with Robot Framework
+
+### Setup
+```bash
+cd tests/robot
+python -m venv robot-env
+robot-env\Scripts\activate  # Windows
+# or: source robot-env/bin/activate  # Linux/Mac
+pip install -r requirements.txt
+```
+
+### Running BDD Tests
+```bash
+cd tests/robot
+robot --outputdir results .          # Run all tests
+robot --outputdir results auth/      # Run authentication tests
+robot --outputdir results --loglevel DEBUG .  # Detailed logging
+```
+
+### Viewing BDD Reports
+After running tests, open:
+- `results/report.html` - Summary
+- `results/log.html` - Detailed log
+
+### BDD Test Structure
+```
+tests/robot/
+├── auth/                  # Authentication BDD tests
+│   ├── login.robot
+│   ├── logout.robot
+│   └── authorization.robot
+├── admin/                 # Admin functionality tests
+│   └── user_management.robot
+├── resources/             # Shared keywords
+│   ├── auth_keywords.robot
+│   └── api_keywords.robot
+└── variables/             # Configuration
+    └── config.robot
+```
+
+### Prerequisites for BDD Tests
+1. Start auth service: `cd services/auth && npm start`
+2. Ensure test users exist in database
+3. Configure `tests/robot/variables/config.robot` with correct URLs and credentials
 
 ## CI/CD Integration
 
