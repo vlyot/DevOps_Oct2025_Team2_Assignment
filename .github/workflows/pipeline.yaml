@@ -297,9 +297,13 @@ jobs:
 
       - name: 3. Install Auth Service Dependencies
         working-directory: ./services/auth
-        run: npm install
+        run: npm ci # clean install of dependencies
 
-      - name: 4. Start Auth Service
+      - name: 4. Compile TypeScript
+        working-directory: ./services/auth
+        run: npm run build
+
+      - name: 5. Start Auth Service
         working-directory: ./services/auth
         run: |
           echo "🚀 Starting auth service for DAST scanning..."
@@ -328,7 +332,7 @@ jobs:
           # Verify service is running
           curl http://localhost:3000/health || echo "⚠️ Service might not be ready"
 
-      - name: 5. Run OWASP ZAP Baseline Scan
+      - name: 6. Run OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: 'http://localhost:3000'
@@ -338,7 +342,7 @@ jobs:
           artifact_name: 'zap-scan-results'
           issue_title: 'DAST Security Scan Results'
 
-      - name: 6. Upload DAST Reports
+      - name: 7. Upload DAST Reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
