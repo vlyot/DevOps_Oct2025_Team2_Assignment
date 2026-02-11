@@ -1,124 +1,70 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-interface User {
-    id: string;
-    email: string;
-    role: string;
-    created_at: string;
-    last_sign_in_at?: string;
-    email_confirmed_at?: string;
-}
+export const createUser = async (userData: any) => {
+  // 1. Get the token from storage
+  const token = localStorage.getItem("token");
 
-interface AdminUsersResponse {
-    users: User[];
-    count: number;
-}
+  const response = await fetch(`${API_URL}/admin/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`, // <--- ADD THIS LINE
+    },
+    body: JSON.stringify(userData),
+  });
 
-interface CreateUserResponse {
-    message: string;
-    user: {
-        id: string;
-        email: string;
-        role: string;
-        created_at: string;
-    };
-}
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to create user");
+  return data;
+};
 
-interface DeleteUserResponse {
-    message: string;
-    deleted_id: string;
-}
+// New function to fetch the list from Supabase
+export const fetchUsers = async () => {
+  const token = localStorage.getItem("token");
 
-interface UpdateRoleResponse {
-    message: string;
-    user_id: string;
-    new_role: string;
-}
+  const response = await fetch(`${API_URL}/admin/users`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-// Get auth token from localStorage
-function getAuthToken(): string {
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to fetch users");
+
+  return data;
+};
+
+export const deleteUserByEmail = async (email: string) => {
     const token = localStorage.getItem('token');
-    if (!token) {
-        throw new Error('No authentication token found');
-    }
-    return token;
-}
-
-// Fetch all users
-export async function fetchUsers(): Promise<User[]> {
-    const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/admin/users`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to fetch users');
-    }
-
-    const data: AdminUsersResponse = await response.json();
-    return data.users;
-}
-
-// Create new user
-export async function createUser(payload: {
-    email: string;
-    password: string;
-    role: 'admin' | 'user';
-}): Promise<CreateUserResponse> {
-    const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/admin/users`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create user');
-    }
-
-    return response.json();
-}
-
-// Delete user
-export async function deleteUser(userId: string): Promise<DeleteUserResponse> {
-    const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+    // Changed URL to use /email/:email path
+    const response = await fetch(`${API_URL}/admin/users/email/${email}`, {
         method: 'DELETE',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
     });
 
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete user');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete user');
     }
+    return true;
+};
 
-    return response.json();
-}
-
-// Update user role
-export async function updateUserRole(userId: string, role: 'admin' | 'user'): Promise<UpdateRoleResponse> {
-    const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/role`, {
-        method: 'PATCH',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+export const updateUserRoleByEmail = async (email: string, newRole: string) => {
+    const token = localStorage.getItem('token');
+    // Changed URL to match your new backend PUT route
+    const response = await fetch(`${API_URL}/admin/users/email/${email}/role`, {
+        method: 'PUT',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ role })
+        body: JSON.stringify({ role: newRole })
     });
 
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update role');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update role');
     }
-
-    return response.json();
-}
+    return await response.json();
+};
