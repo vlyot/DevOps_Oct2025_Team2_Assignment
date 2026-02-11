@@ -15,10 +15,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// SIMPLE LOGIN: Just checks email and password
+
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     
+    // 1. Authenticate with Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -26,12 +27,15 @@ app.post('/login', async (req, res) => {
 
     if (error) return res.status(401).json({ error: error.message });
 
-    // We send a FAKE token so the frontend doesn't crash, 
-    // but we aren't actually validating it yet.
+    // 2. Get the REAL token and role
+    const accessToken = data.session?.access_token; // <--- The Real JWT
+    const role = data.user?.user_metadata?.role || 'user';
+
+    // 3. Send it to the Frontend
     return res.status(200).json({
-        token: "simple-test-token", 
-        role: data.user?.user_metadata?.role || 'admin',
-        message: "Logged in!"
+        token: accessToken, 
+        role: role,
+        message: "Login successful!"
     });
 });
 
