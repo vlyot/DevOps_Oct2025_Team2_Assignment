@@ -241,4 +241,9 @@ app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
   }
 });
 
+// Health check endpoint for DAST scanning
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "healthy", service: "auth" });
+});
+
 app.listen(3000, () => console.log("🚀 Back to basics on port 3000"));
