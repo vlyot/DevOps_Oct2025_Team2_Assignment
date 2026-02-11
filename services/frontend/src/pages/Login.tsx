@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { setupTokenExpirationCheck } from '../utils/auth';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -21,6 +22,9 @@ export default function Login() {
             if (response.ok) {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('role', data.role);
+
+                // Setup token expiration check
+                setupTokenExpirationCheck();
 
                 navigate(data.role === 'admin' ? '/admin' : '/dashboard');
             } else {

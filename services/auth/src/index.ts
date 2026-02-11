@@ -3,13 +3,68 @@ import { supabase } from './lib/supabase';
 import jwt from 'jsonwebtoken';
 import {authorize} from "./middleware/authMiddleware";
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import validator from 'validator';
+import { validateEnvironment } from './config/validateEnv';
+
+// Validate environment variables on startup
+validateEnvironment();
 
 const app = express();
+
+// Security headers
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", "data:", "https:"],
+        }
+    },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    }
+}));
+
 app.use(cors());
 app.use(express.json());
 
-app.post('/login', async (req, res) => {
+// Rate limiter for login attempts
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 requests per window
+    message: {
+        error: 'Too many login attempts. Please try again in 15 minutes.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+app.post('/login', loginLimiter, async (req, res) => {
     const { email, password } = req.body;
+
+    // Input validation
+    if (!email || !password) {
+        return res.status(400).json({
+            error: 'Email and password are required'
+        });
+    }
+
+    if (!validator.isEmail(email)) {
+        return res.status(400).json({
+            error: 'Invalid email format'
+        });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({
+            error: 'Invalid credentials'
+        });
+    }
 
     const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -21,17 +76,35 @@ app.post('/login', async (req, res) => {
     }
 
     const { data: profile } = await supabase
-        .from('profiles')
+        .from('users')
         .select('role')
         .eq('id', data.user.id)
         .single();
 
     const role = profile?.role || 'user';
 
+    // JWT secret validation
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || jwtSecret.length < 32) {
+        console.error('CRITICAL: JWT_SECRET must be at least 32 characters long');
+        return res.status(500).json({
+            error: 'Server configuration error'
+        });
+    }
+
     const token = jwt.sign(
-        { sub: data.user.id, role: role },
-        process.env.JWT_SECRET || 'secret',
-        { expiresIn: '1h' }
+        {
+            sub: data.user.id,
+            role: role,
+            email: data.user.email,
+            iat: Math.floor(Date.now() / 1000)
+        },
+        jwtSecret,
+        {
+            expiresIn: '8h',
+            issuer: 'devsecops-auth-service',
+            audience: 'devsecops-app'
+        }
     );
 
     res.json({ token, role });
