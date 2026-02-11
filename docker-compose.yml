@@ -1,0 +1,48 @@
+version: '3.9'
+
+services:
+  auth:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    container_name: devsecops-auth
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./services/auth/.env
+    networks:
+      - devsecops-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
+    container_name: devsecops-frontend
+    ports:
+      - "80:80"
+    networks:
+      - devsecops-network
+    depends_on:
+      auth:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  devsecops-network:
+    driver: bridge
+    name: devsecops-network
