@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { requireAuth } from './middleware/authMiddleware';
+
 
 dotenv.config();
 
@@ -40,7 +42,7 @@ app.post('/login', async (req, res) => {
 });
 
 // SIMPLE CREATE: No JWT check needed to run this
-app.post('/admin/users', async (req, res) => {
+app.post('/admin/users', requireAuth, async (req, res) => {
     const { email, password, role } = req.body;
 
     // We use the basic signup method which is easier to test
