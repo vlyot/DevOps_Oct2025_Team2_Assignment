@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { setupTokenExpirationCheck } from '../utils/auth';
 
 export default function Login() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('test@example.com'); // Pre-fill for easier testing
+    const [password, setPassword] = useState('password123');
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(''); // Clear previous errors
+
         try {
-            const response = await fetch('http://localhost:3000/login', {
+            console.log("Sending login request...");
+            
+            // Ensure we use the correct URL. 
+            // If VITE_API_URL is not set, fallback to localhost:3000
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            
+            const response = await fetch(`${apiUrl}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -20,62 +27,43 @@ export default function Login() {
             const data = await response.json();
 
             if (response.ok) {
+                console.log("Login success:", data);
+                // Save the fake token so the app "thinks" we are logged in
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('role', data.role);
-
-                // Setup token expiration check
-                setupTokenExpirationCheck();
-
-                navigate(data.role === 'admin' ? '/admin' : '/dashboard');
+                
+                // Navigate to dashboard
+                navigate('/dashboard');
             } else {
                 setError(data.error || 'Login failed');
             }
         } catch (err) {
-            setError('Connection error: Is Auth Service running?');
+            console.error("Login Error:", err);
+            setError('Connection refused. Is the backend running?');
         }
     };
 
-    const fetchFiles = async () => {
-        const token = localStorage.getItem('token');
-
-        const response = await fetch('http://localhost:3000/dashboard/files', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
-        console.log(data.message); // "this is your personal document list"
-    };
-
-
     return (
-        <div style={{ padding: '50px', maxWidth: '400px', margin: '0 auto', textAlign: 'center' }}>
-            <h2>🔐 DevSecOps Login</h2>
+        <div style={{ padding: '50px', maxWidth: '400px', margin: '0 auto' }}>
+            <h2>Step 1: Simple Login</h2>
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <div>
-                    <input
-                        type="email"
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        style={{ width: '100%', padding: '10px' }}
-                        required
-                    />
-                </div>
-                <div>
-                    <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{ width: '100%', padding: '10px' }}
-                        required
-                    />
-                </div>
+                <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    style={{ padding: '10px' }}
+                />
+                <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    style={{ padding: '10px' }}
+                />
                 {error && <p style={{ color: 'red' }}>{error}</p>}
-                <button type="submit" style={{ padding: '10px', cursor: 'pointer', backgroundColor: '#007bff', color: 'white', border: 'none' }}>
-                    Sign In
+                <button type="submit" style={{ padding: '10px', backgroundColor: '#007bff', color: 'white' }}>
+                    Test Login
                 </button>
             </form>
         </div>
