@@ -6,6 +6,9 @@ import { requireAuth } from "./middleware/authMiddleware";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import validator from "validator";
+import swaggerUi from "swagger-ui-express";
+import swaggerJsdoc from "swagger-jsdoc";
+import { swaggerOptions } from "./config/swagger";
 
 dotenv.config();
 
@@ -16,6 +19,24 @@ const supabase = createClient(
 );
 
 const app = express();
+
+// Swagger setup
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "DevSecOps Auth API",
+  })
+);
+
+app.get("/api-docs.json", (_req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
+
 // 1. HELMET: Sets various HTTP headers to block common web attacks
 app.use(
   helmet({
@@ -48,7 +69,41 @@ app.use(loginLimiter);
 app.use(cors());
 app.use(express.json());
 
-app.post("/login", async (req, res) => {
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Authenticate user and receive JWT token
+ *     description: Authenticates a user with email and password, returns JWT token valid for 8 hours. Rate limited to 5 attempts per 15 minutes per IP.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Successful authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         description: Too many login attempts (rate limited - 5 attempts per 15 minutes)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *     security: []
+ */
+app.post("/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   // VALIDATION LAYER
@@ -79,7 +134,44 @@ app.post("/login", async (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /admin/users:
+ *   post:
+ *     summary: Create new user (admin only)
+ *     description: Creates a new user with specified email, password, and role. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateUserRequest'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CreateUserResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 app.post("/admin/users", requireAuth, async (req, res) => {
+  // 1. validation to Check if the requester is an admin
+  const requesterRole = (req as any).user?.user_metadata?.role;
+  if (requesterRole !== "admin") {
+    return res.status(403).json({ error: "Access denied: Admins only" });
+  }
+
   const { email, password, role } = req.body;
 
   if (!validator.isEmail(email)) {
@@ -109,6 +201,29 @@ app.post("/admin/users", requireAuth, async (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /admin/users:
+ *   get:
+ *     summary: Get all users (admin only)
+ *     description: Retrieves a list of all users with their roles and metadata. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UsersListResponse'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 app.get("/admin/users", requireAuth, async (req, res) => {
   // 1. validation to Check if the requester is an admin
   const requesterRole = (req as any).user?.user_metadata?.role;
@@ -159,9 +274,46 @@ app.get("/admin/users", requireAuth, async (req, res) => {
   return res.status(200).json(users);
 });
 
+/**
+ * @swagger
+ * /admin/users/{id}:
+ *   delete:
+ *     summary: Delete user (admin only)
+ *     description: Deletes a user by ID. Admin cannot delete their own account. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID to delete
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DeleteUserResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Forbidden - cannot delete own account or insufficient permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 // DELETE route - Remove a user
 app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
-    // 1. validation to Check if the requester is an admin
+  // 1. validation to Check if the requester is an admin
   const requesterRole = (req as any).user?.user_metadata?.role;
   if (requesterRole !== "admin") {
     return res.status(403).json({ error: "Access denied: Admins only" });
@@ -205,6 +357,45 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /admin/users/{id}/role:
+ *   patch:
+ *     summary: Update user role (admin only)
+ *     description: Updates a user's role to either admin or user. Requires admin authorization.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateRoleRequest'
+ *     responses:
+ *       200:
+ *         description: User role updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UpdateRoleResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 // UPDATE route - Change a user's role
 app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
   const { email } = req.params;
@@ -251,6 +442,22 @@ app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Returns the health status of the auth service. Used for monitoring and DAST scanning.
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthResponse'
+ *     security: []
+ */
 // Health check endpoint for DAST scanning
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "healthy", service: "auth" });

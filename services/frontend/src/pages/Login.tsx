@@ -45,7 +45,7 @@ export default function Login() {
 
     return (
         <div style={{ padding: '50px', maxWidth: '400px', margin: '0 auto' }}>
-            <h2>Step 1: Simple Login</h2>
+            <h2>Login</h2>
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 <input
                     type="email"
