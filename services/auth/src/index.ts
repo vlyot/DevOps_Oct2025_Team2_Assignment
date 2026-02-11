@@ -106,4 +106,91 @@ app.get("/admin/users", requireAuth, async (req, res) => {
   return res.status(200).json(users);
 });
 
+// DELETE route - Remove a user
+app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
+  const { email } = req.params;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  const supabaseAdmin = createClient(
+    process.env.SUPABASE_URL as string,
+    serviceKey as string,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  try {
+    // 1. Find the user by email first to get their UUID
+    const { data: listData, error: listError } =
+      await supabaseAdmin.auth.admin.listUsers();
+
+    if (listError) throw listError;
+
+    const userToDelete = listData.users.find((u) => u.email === email);
+
+    if (!userToDelete) {
+      return res.status(404).json({ error: "User with this email not found" });
+    }
+
+    // 2. Delete the user using the UUID we just found
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
+      userToDelete.id
+    );
+
+    if (deleteError) throw deleteError;
+
+    return res.status(200).json({
+      message: `User ${email} deleted successfully`,
+      id: userToDelete.id,
+    });
+  } catch (err: any) {
+    console.error("Delete Error:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// UPDATE route - Change a user's role
+app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
+  const { email } = req.params;
+  const { role } = req.body; // e.g., { "role": "admin" }
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  const supabaseAdmin = createClient(
+    process.env.SUPABASE_URL as string,
+    serviceKey as string,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  try {
+    // 1. Find the user by email to get their ID
+    const { data: listData, error: listError } =
+      await supabaseAdmin.auth.admin.listUsers();
+    if (listError) throw listError;
+
+    const userToUpdate = listData.users.find((u) => u.email === email);
+
+    if (!userToUpdate) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // 2. Update the metadata using the ID we found
+    const { data: updatedData, error: updateError } =
+      await supabaseAdmin.auth.admin.updateUserById(userToUpdate.id, {
+        user_metadata: { role: role },
+      });
+
+    if (updateError) throw updateError;
+
+    return res.status(200).json({
+      message: `Role for ${email} updated to ${role}`,
+      user: {
+        id: updatedData.user.id,
+        email: updatedData.user.email,
+        role: updatedData.user.user_metadata.role,
+      },
+    });
+  } catch (err: any) {
+    console.error("Update Error:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(3000, () => console.log("🚀 Back to basics on port 3000"));
