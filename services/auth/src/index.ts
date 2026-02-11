@@ -9,6 +9,7 @@ import validator from "validator";
 import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./config/swagger";
+import { login } from "./controllers/authController";
 
 dotenv.config();
 
@@ -103,36 +104,8 @@ app.use(express.json());
  *         $ref: '#/components/responses/InternalServerError'
  *     security: []
  */
-app.post("/login", loginLimiter, async (req, res) => {
-  const { email, password } = req.body;
+app.post("/login", loginLimiter, login);
 
-  // VALIDATION LAYER
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-  if (!validator.isEmail(email)) {
-    return res.status(400).json({ error: "Invalid email format" });
-  }
-
-  // 1. Authenticate with Supabase
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) return res.status(401).json({ error: error.message });
-
-  // 2. Get the REAL token and role
-  const accessToken = data.session?.access_token; // <--- The Real JWT
-  const role = data.user?.user_metadata?.role || "user";
-
-  // 3. Send it to the Frontend
-  return res.status(200).json({
-    token: accessToken,
-    role: role,
-    message: "Login successful!",
-  });
-});
 
 /**
  * @swagger
