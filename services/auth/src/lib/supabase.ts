@@ -4,7 +4,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''; // Use Service Role for admin actions
 
-// create a single supabase client for interacting with your database
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Supabase credentials missing in .env');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseServiceKey);

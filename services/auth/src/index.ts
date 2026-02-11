@@ -1,71 +1,60 @@
 import express from 'express';
 import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Initialize Supabase with the ANON key for simplicity
+const supabase = createClient(
+    process.env.SUPABASE_URL || '', 
+    process.env.SUPABASE_ANON_KEY || ''
+);
 
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. The "Database" (Just an array for now)
-let users = [
-    {
-        id: 1,
-        email: "admin@example.com",
-        password: "password123",
-        role: "admin" // We need this to be 'admin' to see the dashboard
-    }
-];
-
-// 2. Login Route (Checks the array)
-app.post('/login', (req, res) => {
+// SIMPLE LOGIN: Just checks email and password
+app.post('/login', async (req, res) => {
     const { email, password } = req.body;
-    console.log(`Login attempt: ${email}`);
-
-    const user = users.find(u => u.email === email && u.password === password);
-
-    if (user) {
-        return res.status(200).json({
-            token: "fake-jwt-token",
-            role: user.role,
-            message: "Login successful!"
-        });
-    }
-
-    return res.status(401).json({ error: "Invalid credentials" });
-});
-
-// 3. Create User Route (Adds to the array)
-app.post('/admin/users', (req, res) => {
-    const { email, password, role } = req.body;
-    console.log(`Creating user: ${email}`);
-
-    // Basic validation
-    if (!email || !password) {
-        return res.status(400).json({ error: "Email and Password are required" });
-    }
-
-    // Check if user already exists
-    if (users.find(u => u.email === email)) {
-        return res.status(400).json({ error: "User already exists" });
-    }
-
-    const newUser = {
-        id: users.length + 1,
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        role: role || 'user'
-    };
+    });
 
-    users.push(newUser);
-    
-    console.log("Current Users:", users); // Log to see it working
-    return res.status(201).json(newUser);
+    if (error) return res.status(401).json({ error: error.message });
+
+    // We send a FAKE token so the frontend doesn't crash, 
+    // but we aren't actually validating it yet.
+    return res.status(200).json({
+        token: "simple-test-token", 
+        role: data.user?.user_metadata?.role || 'admin',
+        message: "Logged in!"
+    });
 });
 
-app.listen(PORT, () => {
-    console.log(`✅ Auth Service running on http://localhost:${PORT}`);
+// SIMPLE CREATE: No JWT check needed to run this
+app.post('/admin/users', async (req, res) => {
+    const { email, password, role } = req.body;
+
+    // We use the basic signup method which is easier to test
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            data: { role: role || 'user' }
+        }
+    });
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    return res.status(201).json({
+        id: data.user?.id,
+        email: email,
+        role: role
+    });
 });
+
+app.listen(3000, () => console.log("🚀 Back to basics on port 3000"));
