@@ -110,6 +110,11 @@ app.post("/admin/users", requireAuth, async (req, res) => {
 });
 
 app.get("/admin/users", requireAuth, async (req, res) => {
+  // 1. validation to Check if the requester is an admin
+  const requesterRole = (req as any).user?.user_metadata?.role;
+  if (requesterRole !== "admin") {
+    return res.status(403).json({ error: "Access denied: Admins only" });
+  }
   console.log("Attempting to list users...");
 
   // DEBUG: Check if the key is actually loaded
@@ -156,6 +161,11 @@ app.get("/admin/users", requireAuth, async (req, res) => {
 
 // DELETE route - Remove a user
 app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
+    // 1. validation to Check if the requester is an admin
+  const requesterRole = (req as any).user?.user_metadata?.role;
+  if (requesterRole !== "admin") {
+    return res.status(403).json({ error: "Access denied: Admins only" });
+  }
   const { email } = req.params;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
