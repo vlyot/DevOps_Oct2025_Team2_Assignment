@@ -3,6 +3,9 @@ import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { requireAuth } from "./middleware/authMiddleware";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import validator from "validator";
 
 dotenv.config();
 
@@ -13,11 +16,48 @@ const supabase = createClient(
 );
 
 const app = express();
+// 1. HELMET: Sets various HTTP headers to block common web attacks
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // Allows CSS from your own app
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"], // Allows images from HTTPS sources
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // Enforce HTTPS for 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+  })
+);
+
+// 2. RATE LIMITER: Stops hackers from brute-forcing passwords
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window (increased for testing)
+  message: { error: "Too many attempts. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(loginLimiter);
 app.use(cors());
 app.use(express.json());
 
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
+
+  // VALIDATION LAYER
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
 
   // 1. Authenticate with Supabase
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -39,9 +79,17 @@ app.post("/login", async (req, res) => {
   });
 });
 
-// SIMPLE CREATE: No JWT check needed to run this
 app.post("/admin/users", requireAuth, async (req, res) => {
   const { email, password, role } = req.body;
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+  if (password.length < 6) {
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 6 characters" });
+  }
 
   // We use the basic signup method which is easier to test
   const { data, error } = await supabase.auth.signUp({
