@@ -55,7 +55,32 @@ export async function fetchFileById(fileId: string): Promise<FileRecord | null> 
 
 // Download file
 export async function downloadFile(fileId: string): Promise<void> {
+    const userId = await getCurrentUserId();
 
+    const { data, error } = await supabase
+        .from('files')
+        .select('storage_path, file_name')
+        .eq('id', fileId)
+        .eq('user_id', userId)
+        .single();
+
+    if (error || !data) {
+        throw new Error('File not found');
+    }
+
+    const { data: content, error: storageError } = await supabase.storage
+        .from('user-files')
+        .download(data.storage_path);
+
+    if (storageError || !content) {
+        throw new Error('Failed to download file from storage');
+    }
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = data.file_name;
+    document.body.appendChild(a);
+    a.click();
 }
 
 // Upload + create metadata
