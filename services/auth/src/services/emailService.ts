@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import * as fs from 'fs';
 import * as path from 'path';
+import { subscriberRepository } from '../repositories/subscriberRepository';
 
 type CRUDAction = 'create' | 'read' | 'update' | 'delete';
 
@@ -48,38 +49,55 @@ class EmailService {
     }
   }
 
-  async sendUserCreatedEmail(email: string, role: string): Promise<boolean> {
+  /**
+   * Send email to all active subscribers
+   */
+  async sendToAllSubscribers(subject: string, html: string): Promise<number> {
+    const subscribers = await subscriberRepository.getActiveSubscribers();
+
+    if (subscribers.length === 0) {
+      console.log('[Email] No active subscribers');
+      return 0;
+    }
+
+    console.log(`[Email] Sending to ${subscribers.length} subscribers...`);
+
+    let successCount = 0;
+    for (const email of subscribers) {
+      const success = await this.sendEmail(email, subject, html);
+      if (success) successCount++;
+    }
+
+    console.log(`[Email] Sent ${successCount}/${subscribers.length} emails successfully`);
+    return successCount;
+  }
+
+  async sendUserCreatedEmail(email: string, role: string): Promise<number> {
     const template = this.loadTemplate('userCreated.html');
     const html = template
       .replace('{{email}}', email)
       .replace('{{role}}', role)
       .replace('{{action}}', 'CREATE');
 
-    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 's10259894A@connect.np.edu.sg';
-
-    return this.sendEmail(
-      adminEmail,
+    return this.sendToAllSubscribers(
       'User Account Created - DevSecOps Platform',
       html
     );
   }
 
-  async sendUserReadEmail(email: string): Promise<boolean> {
+  async sendUserReadEmail(email: string): Promise<number> {
     const template = this.loadTemplate('userRead.html');
     const html = template
       .replace('{{email}}', email)
       .replace('{{action}}', 'READ');
 
-    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 's10259894A@connect.np.edu.sg';
-
-    return this.sendEmail(
-      adminEmail,
+    return this.sendToAllSubscribers(
       'User Account Accessed - DevSecOps Platform',
       html
     );
   }
 
-  async sendUserUpdatedEmail(email: string, oldRole: string, newRole: string): Promise<boolean> {
+  async sendUserUpdatedEmail(email: string, oldRole: string, newRole: string): Promise<number> {
     const template = this.loadTemplate('userUpdated.html');
     const html = template
       .replace(/{{email}}/g, email)
@@ -87,25 +105,19 @@ class EmailService {
       .replace('{{newRole}}', newRole)
       .replace('{{action}}', 'UPDATE');
 
-    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 's10259894A@connect.np.edu.sg';
-
-    return this.sendEmail(
-      adminEmail,
+    return this.sendToAllSubscribers(
       'User Account Updated - DevSecOps Platform',
       html
     );
   }
 
-  async sendUserDeletedEmail(email: string): Promise<boolean> {
+  async sendUserDeletedEmail(email: string): Promise<number> {
     const template = this.loadTemplate('userDeleted.html');
     const html = template
       .replace('{{email}}', email)
       .replace('{{action}}', 'DELETE');
 
-    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 's10259894A@connect.np.edu.sg';
-
-    return this.sendEmail(
-      adminEmail,
+    return this.sendToAllSubscribers(
       'User Account Deleted - DevSecOps Platform',
       html
     );

@@ -10,6 +10,7 @@ import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./config/swagger";
 import { emailService } from "./services/emailService";
+import { subscriberRepository } from "./repositories/subscriberRepository";
 
 dotenv.config();
 
@@ -501,6 +502,228 @@ app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
 // Health check endpoint for DAST scanning
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "healthy", service: "auth" });
+});
+
+/**
+ * @swagger
+ * /subscribe:
+ *   post:
+ *     summary: Subscribe to email notifications
+ *     description: Subscribe an email address to receive notifications about all user CRUD operations. No authentication required.
+ *     tags: [Subscriptions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to subscribe
+ *                 example: user@example.com
+ *     responses:
+ *       201:
+ *         description: Successfully subscribed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Successfully subscribed to notifications
+ *                 email:
+ *                   type: string
+ *                   example: user@example.com
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *     security: []
+ */
+app.post("/subscribe", async (req, res) => {
+  const { email } = req.body;
+
+  // Validation
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  // Subscribe
+  const subscriber = await subscriberRepository.subscribe(email);
+
+  if (!subscriber) {
+    return res.status(500).json({ error: "Failed to subscribe" });
+  }
+
+  return res.status(201).json({
+    message: "Successfully subscribed to notifications",
+    email: subscriber.email,
+  });
+});
+
+/**
+ * @swagger
+ * /unsubscribe:
+ *   post:
+ *     summary: Unsubscribe from email notifications
+ *     description: Unsubscribe an email address from receiving notifications. No authentication required.
+ *     tags: [Subscriptions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to unsubscribe
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Successfully unsubscribed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Successfully unsubscribed from notifications
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *     security: []
+ */
+app.post("/unsubscribe", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  const success = await subscriberRepository.unsubscribe(email);
+
+  if (!success) {
+    return res.status(500).json({ error: "Failed to unsubscribe" });
+  }
+
+  return res.status(200).json({
+    message: "Successfully unsubscribed from notifications",
+  });
+});
+
+/**
+ * @swagger
+ * /subscribe/status:
+ *   get:
+ *     summary: Check subscription status
+ *     description: Check if an email is subscribed to notifications
+ *     tags: [Subscriptions]
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: Email address to check
+ *     responses:
+ *       200:
+ *         description: Subscription status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 subscribed:
+ *                   type: boolean
+ *                   example: true
+ *                 email:
+ *                   type: string
+ *                   example: user@example.com
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *     security: []
+ */
+app.get("/subscribe/status", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: "Email parameter is required" });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  const subscribed = await subscriberRepository.isSubscribed(email);
+
+  return res.status(200).json({
+    subscribed,
+    email,
+  });
+});
+
+/**
+ * @swagger
+ * /admin/subscribers:
+ *   get:
+ *     summary: Get all subscribers (admin only)
+ *     description: Retrieve a list of all email subscribers including inactive ones
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all subscribers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                     format: uuid
+ *                   email:
+ *                     type: string
+ *                   subscribed_at:
+ *                     type: string
+ *                     format: date-time
+ *                   is_active:
+ *                     type: boolean
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+app.get("/admin/subscribers", requireAuth, async (req, res) => {
+  const requesterRole = (req as any).user?.user_metadata?.role;
+  if (requesterRole !== "admin") {
+    return res.status(403).json({ error: "Access denied: Admins only" });
+  }
+
+  const subscribers = await subscriberRepository.getAllSubscribers();
+  return res.status(200).json(subscribers);
 });
 
 app.listen(3000, async () => {
