@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createUser } from '../../services/adminApi'; // Removed fetchUsers for now to keep it simple
+import { createUser, fetchUsers } from '../../services/adminApi'; // Removed fetchUsers for now to keep it simple
 import CreateUserForm  from './CreateUserForm';
 
 // Simplified User interface to match our local backend
@@ -10,18 +10,38 @@ interface User {
 }
 
 export function AdminDashboard() {
+    // Change ID to string because Supabase IDs are UUID strings (e.g., "a1b2-c3d4...")
+    interface User {
+        id: string; 
+        email: string;
+        role: string;
+    }
+
     const [users, setUsers] = useState<User[]>([]);
     const [status, setStatus] = useState('');
 
-    // Function to handle the creation logic passed to the form
+    // 1. Load users when the page opens
+    useEffect(() => {
+        loadUsers();
+    }, []);
+
+    const loadUsers = async () => {
+        try {
+            const data = await fetchUsers();
+            setUsers(data);
+        } catch (error) {
+            console.error("Failed to load users", error);
+        }
+    };
+
     const handleCreate = async (email: string, password: string, role: string) => {
         try {
             setStatus('Creating user...');
-            const newUser = await createUser({ email, password, role });
-            
-            // Immediately update the local list so you can see the result
-            setUsers(prev => [...prev, newUser]);
+            await createUser({ email, password, role });
             setStatus('✅ User created successfully!');
+            
+            // Reload the list to see the new user
+            loadUsers(); 
         } catch (err: any) {
             console.error('Error creating user:', err);
             setStatus(`❌ Error: ${err.message}`);

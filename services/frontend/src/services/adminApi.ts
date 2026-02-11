@@ -20,7 +20,17 @@ export const createUser = async (userData: any) => {
 
 // New function to fetch the list from Supabase
 export const fetchUsers = async () => {
-  // Note: You'll need to create a GET route in your backend for this later
-  // For now, we will rely on the local state update in the Dashboard
-  return [];
+    const token = localStorage.getItem('token');
+    
+    const response = await fetch(`${API_URL}/admin/users`, {
+        method: 'GET',
+        headers: { 
+            'Authorization': `Bearer ${token}` 
+        }
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
+    
+    return data;
 };

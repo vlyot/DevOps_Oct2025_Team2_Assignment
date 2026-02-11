@@ -1,13 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''; // Use Service Role for admin actions
+// Logic check: If SERVICE_ROLE is missing, this will fail
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Supabase credentials missing in .env');
+if (!supabaseKey) {
+  console.error("❌ CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing from .env");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
