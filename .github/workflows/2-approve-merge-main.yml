@@ -1,0 +1,57 @@
+name: 2️⃣ Approval & Merge to Main
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  merge:
+    name: Merge dev branch into main on approval
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ⚙️ Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions@github.com"
+
+      - name: 🌳 Prepare main branch
+        run: |
+          # Fetch the dev branch you are releasing FROM
+          git fetch origin feat/testing-pipelines
+
+          # Ensure main exists
+          if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+            echo "main does not exist yet, creating it..."
+            git checkout -b main
+            git push origin main
+          else
+            git checkout main
+          fi
+
+      - name: 🔄 Merge dev → main
+        run: |
+          git fetch origin feat/testing-pipelines
+          git merge origin/feat/testing-pipelines --no-ff -m "Release approved"
+
+      - name: 🏷️ Create Release Tag
+        id: tag
+        run: |
+          # TODO: choose your own versioning strategy
+          RELEASE_TAG="v1.0.0"
+          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: 📤 Push to GitHub
+        run: |
+          git push origin main
+          git push origin ${{ steps.tag.outputs.release_tag }}
+          echo "✅ Merged to main and pushed tag ${{ steps.tag.outputs.release_tag }}"

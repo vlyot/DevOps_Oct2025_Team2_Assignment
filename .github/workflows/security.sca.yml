@@ -1,11 +1,10 @@
 name: Security - SCA (Dependency Scan)
 
 on:
-  pull_request:
-    branches: [ "feat/testing-pipelines" ]  # PRs into this branch
   push:
-    branches: [ "feat/testing-pipelines" ]  # direct pushes/merges into this branch
-  workflow_dispatch:
+    branches: [ "develop" ]
+  pull_request:
+    branches: [ "develop" ]
 
 
 permissions:
