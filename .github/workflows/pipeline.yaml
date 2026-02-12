@@ -395,6 +395,67 @@ jobs:
           echo "1. Check the **Security tab** for SARIF findings" >> $GITHUB_STEP_SUMMARY
           echo "2. Download artifacts to review detailed HTML reports" >> $GITHUB_STEP_SUMMARY
           echo "3. Address any HIGH/CRITICAL vulnerabilities before merging" >> $GITHUB_STEP_SUMMARY
+  # --- PIPELINE NOTIFICATION JOB ---
+  # Sends email notifications to subscribed stakeholders based on pipeline status
+  pipeline-notification:
+    runs-on: ubuntu-latest
+    needs: [devsecops-pipeline, sast-scan]
+    if: always()  # Run even if previous jobs fail
+    
+    steps:
+      - name: Determine Pipeline Status
+        id: status
+        run: |
+          if [[ "${{ needs.devsecops-pipeline.result }}" == "failure" ]] || \
+             [[ "${{ needs.sast-scan.result }}" == "failure" ]]; then
+            echo "pipeline_status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "pipeline_status=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Email Notification
+        continue-on-error: true
+        run: |
+          cat > payload.json <<'PAYLOAD_EOF'
+          {
+            "status": "${{ steps.status.outputs.pipeline_status }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}",
+            "actor": "${{ github.actor }}",
+            "runId": "${{ github.run_id }}",
+            "runUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "jobs": [
+              {"name": "devsecops-pipeline", "status": "${{ needs.devsecops-pipeline.result }}"},
+              {"name": "sast-scan", "status": "${{ needs.sast-scan.result }}"}
+            ],
+            "duration": "~15 minutes",
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          PAYLOAD_EOF
+
+          echo "📧 Sending pipeline notification..."
+          
+          # NOTE: Update AUTH_SERVICE_URL to your deployed service URL
+          # For local testing, you can use ngrok or similar
+          # For production, set this as a GitHub secret
+          AUTH_URL="${{ secrets.AUTH_SERVICE_URL || 'http://localhost:3000' }}"
+
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -d @payload.json \
+            "$AUTH_URL/pipeline/notify" 2>&1 || echo -e "\n000")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Pipeline notification sent successfully"
+            echo "$body"
+          else
+            echo "⚠️  Pipeline notification failed (HTTP $http_code)"
+            echo "$body"
+            echo "Note: This does not affect pipeline status"
+          fi
 
 
    # --- THE QA GATE: Only triggers on your branch for testing ---

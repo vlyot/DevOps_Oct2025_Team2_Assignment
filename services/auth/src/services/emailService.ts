@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import * as fs from 'fs';
 import * as path from 'path';
 import { subscriberRepository } from '../repositories/subscriberRepository';
+import { PipelineData } from '../models/PipelineData';
 
 type CRUDAction = 'create' | 'read' | 'update' | 'delete';
 
@@ -155,6 +156,97 @@ class EmailService {
 
     // Resend doesn't have a verify method, but we can check if the API key is set
     return !!process.env.RESEND_API_KEY;
+  }
+
+  /**
+   * Send email to subscribers based on their roles
+   */
+  async sendToSubscribersByRole(subject: string, html: string, roles: string[]): Promise<number> {
+    const subscribers = await subscriberRepository.getActiveSubscribersByRole(roles);
+
+    if (subscribers.length === 0) {
+      console.log(`[Email] No active subscribers for roles: ${roles.join(', ')}`);
+      return 0;
+    }
+
+    console.log(`[Email] Sending to ${subscribers.length} subscribers (roles: ${roles.join(', ')})...`);
+
+    let successCount = 0;
+    for (const email of subscribers) {
+      const success = await this.sendEmail(email, subject, html);
+      if (success) successCount++;
+    }
+
+    console.log(`[Email] Sent ${successCount}/${subscribers.length} emails successfully`);
+    return successCount;
+  }
+
+  async sendPipelineSuccessEmail(pipelineData: PipelineData): Promise<number> {
+    const template = this.loadTemplate('pipelineSuccess.html');
+    const html = template
+      .replace('{{branch}}', pipelineData.branch)
+      .replace('{{commit}}', pipelineData.commit.substring(0, 7))
+      .replace('{{actor}}', pipelineData.actor)
+      .replace('{{duration}}', pipelineData.duration || 'N/A')
+      .replace('{{timestamp}}', pipelineData.timestamp)
+      .replace('{{runUrl}}', pipelineData.runUrl);
+
+    const roles = pipelineData.notifyRoles || ['admin', 'stakeholder'];
+    return this.sendToSubscribersByRole(
+      `✅ Pipeline Success - ${pipelineData.branch}`,
+      html,
+      roles
+    );
+  }
+
+  async sendPipelineFailureEmail(pipelineData: PipelineData): Promise<number> {
+    const template = this.loadTemplate('pipelineFailure.html');
+
+    let failedServicesHtml = '';
+    if (pipelineData.failedServices) {
+      const services = pipelineData.failedServices.split(',').filter(s => s.trim());
+      if (services.length > 0) {
+        failedServicesHtml = `
+        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+          <h3 style="margin-top: 0; color: #856404;">⚠️ Failed Services</h3>
+          <ul style="margin: 10px 0; padding-left: 20px;">
+            ${services.map(s => `<li style="color: #856404;"><strong>${s}</strong></li>`).join('')}
+          </ul>
+        </div>
+      `;
+      }
+    }
+
+    let securityHtml = '';
+    if (pipelineData.securityFindings &&
+        (pipelineData.securityFindings.critical > 0 || pipelineData.securityFindings.high > 0)) {
+      securityHtml = `
+      <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+        <h3 style="margin-top: 0; color: #721c24;">🔒 Security Findings</h3>
+        <p style="margin: 5px 0;"><strong>Critical:</strong> <span style="color: #dc3545;">${pipelineData.securityFindings.critical}</span></p>
+        <p style="margin: 5px 0;"><strong>High:</strong> <span style="color: #dc3545;">${pipelineData.securityFindings.high}</span></p>
+        <p style="margin: 5px 0;"><strong>Medium:</strong> ${pipelineData.securityFindings.medium}</p>
+        <p style="margin: 5px 0;"><strong>Low:</strong> ${pipelineData.securityFindings.low}</p>
+      </div>
+    `;
+    }
+
+    const html = template
+      .replace('{{branch}}', pipelineData.branch)
+      .replace('{{commit}}', pipelineData.commit.substring(0, 7))
+      .replace('{{actor}}', pipelineData.actor)
+      .replace('{{duration}}', pipelineData.duration || 'N/A')
+      .replace('{{timestamp}}', pipelineData.timestamp)
+      .replace('{{runUrl}}', pipelineData.runUrl)
+      .replace('{{failedServices}}', failedServicesHtml)
+      .replace('{{securityFindings}}', securityHtml);
+
+    const roles = pipelineData.notifyRoles || ['admin', 'developer'];
+    return this.sendToSubscribersByRole(
+      `❌ Pipeline Failed - ${pipelineData.branch}`,
+      html,
+      roles
+    );
   }
 }
 

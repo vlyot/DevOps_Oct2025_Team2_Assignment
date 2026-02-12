@@ -11,6 +11,7 @@ import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./config/swagger";
 import { emailService } from "./services/emailService";
 import { subscriberRepository } from "./repositories/subscriberRepository";
+import { PipelineData } from "./models/PipelineData";
 
 dotenv.config();
 
@@ -506,6 +507,33 @@ app.get("/health", (_req, res) => {
 
 /**
  * @swagger
+ * /dashboard/files:
+ *   get:
+ *     summary: Get user dashboard files
+ *     description: Returns personalized document list for authenticated users
+ *     tags: [User Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard data retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DashboardResponse'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+app.get("/dashboard/files", requireAuth, (_req, res) => {
+  return res.status(200).json({
+    message: "this is your personal document list"
+  });
+});
+
+/**
+ * @swagger
  * /subscribe:
  *   post:
  *     summary: Subscribe to email notifications
@@ -546,7 +574,7 @@ app.get("/health", (_req, res) => {
  *     security: []
  */
 app.post("/subscribe", async (req, res) => {
-  const { email } = req.body;
+  const { email, role } = req.body;
 
   // Validation
   if (!email) {
@@ -557,8 +585,14 @@ app.post("/subscribe", async (req, res) => {
     return res.status(400).json({ error: "Invalid email format" });
   }
 
+  // Validate role if provided
+  const validRoles = ['admin', 'developer', 'stakeholder'];
+  if (role && !validRoles.includes(role)) {
+    return res.status(400).json({ error: "Invalid role. Must be: admin, developer, or stakeholder" });
+  }
+
   // Subscribe
-  const subscriber = await subscriberRepository.subscribe(email);
+  const subscriber = await subscriberRepository.subscribe(email, role);
 
   if (!subscriber) {
     return res.status(500).json({ error: "Failed to subscribe" });
@@ -567,6 +601,7 @@ app.post("/subscribe", async (req, res) => {
   return res.status(201).json({
     message: "Successfully subscribed to notifications",
     email: subscriber.email,
+    role: subscriber.role,
   });
 });
 
@@ -724,6 +759,77 @@ app.get("/admin/subscribers", requireAuth, async (req, res) => {
 
   const subscribers = await subscriberRepository.getAllSubscribers();
   return res.status(200).json(subscribers);
+});
+
+/**
+ * @swagger
+ * /pipeline/notify:
+ *   post:
+ *     summary: Receive pipeline status notification from GitHub Actions
+ *     description: Webhook endpoint for CI/CD pipeline to send status notifications
+ *     tags: [Pipeline]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *               - branch
+ *               - runUrl
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [success, failure]
+ *               branch:
+ *                 type: string
+ *               commit:
+ *                 type: string
+ *               actor:
+ *                 type: string
+ *               runId:
+ *                 type: string
+ *               runUrl:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Notification processed successfully
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *     security: []
+ */
+app.post("/pipeline/notify", async (req, res) => {
+  const pipelineData: PipelineData = req.body;
+
+  if (!pipelineData.status || !pipelineData.branch || !pipelineData.runUrl) {
+    return res.status(400).json({ error: "Missing required pipeline data" });
+  }
+
+  try {
+    let emailsSent = 0;
+
+    if (pipelineData.status === 'success' && process.env.SEND_PIPELINE_SUCCESS_EMAIL === 'true') {
+      console.log('[Pipeline] Sending success notification');
+      emailsSent = await emailService.sendPipelineSuccessEmail(pipelineData);
+    } else if (pipelineData.status === 'failure' && process.env.SEND_PIPELINE_FAILURE_EMAIL === 'true') {
+      console.log('[Pipeline] Sending failure notification');
+      emailsSent = await emailService.sendPipelineFailureEmail(pipelineData);
+    } else {
+      console.log('[Pipeline] Notification skipped (feature flag disabled)');
+    }
+
+    return res.status(200).json({
+      message: "Pipeline notification processed",
+      status: pipelineData.status,
+      emailsSent: emailsSent
+    });
+  } catch (error: any) {
+    console.error('[Pipeline] Notification error:', error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 app.listen(3000, async () => {
