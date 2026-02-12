@@ -1,0 +1,16 @@
+.git
+.gitignore
+*.md
+!DOCKER.md
+.env
+.env.*
+!.env.example
+node_modules
+coverage
+dist
+*.log
+.idea
+.vscode
+.github
+.claude
+scripts

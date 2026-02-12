@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+*.log
+.env
+.git
+.gitignore
+README.md
+__tests__
+jest.config.js
+.eslintrc.json
