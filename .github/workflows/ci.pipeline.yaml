@@ -2,10 +2,9 @@ name: CI Quality Gate
 
 on:
   push:
-    branches: [ "feat/testing-pipelines" ]
+    branches: [ "develop" ]
   pull_request:
-    branches: [ "feat/testing-pipelines" ]
-  workflow_dispatch:
+    branches: [ "develop" ]
 
 permissions:
   contents: read
