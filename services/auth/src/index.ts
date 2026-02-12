@@ -507,6 +507,33 @@ app.get("/health", (_req, res) => {
 
 /**
  * @swagger
+ * /dashboard/files:
+ *   get:
+ *     summary: Get user dashboard files
+ *     description: Returns personalized document list for authenticated users
+ *     tags: [User Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard data retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DashboardResponse'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+app.get("/dashboard/files", requireAuth, (_req, res) => {
+  return res.status(200).json({
+    message: "this is your personal document list"
+  });
+});
+
+/**
+ * @swagger
  * /subscribe:
  *   post:
  *     summary: Subscribe to email notifications
