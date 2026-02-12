@@ -739,7 +739,7 @@ app.get("/admin/subscribers", requireAuth, async (req, res) => {
  * /pipeline/notify:
  *   post:
  *     summary: Receive pipeline status notification from GitHub Actions
- *     description: Webhook endpoint for CI/CD pipeline to send status notifications. Requires notification token.
+ *     description: Webhook endpoint for CI/CD pipeline to send status notifications
  *     tags: [Pipeline]
  *     requestBody:
  *       required: true
@@ -770,21 +770,11 @@ app.get("/admin/subscribers", requireAuth, async (req, res) => {
  *         description: Notification processed successfully
  *       400:
  *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         description: Invalid notification token
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  *     security: []
  */
 app.post("/pipeline/notify", async (req, res) => {
-  const providedToken = req.headers['x-pipeline-token'];
-  const expectedToken = process.env.PIPELINE_NOTIFICATION_TOKEN;
-
-  if (!expectedToken || providedToken !== expectedToken) {
-    console.warn('[Pipeline] Invalid token attempt');
-    return res.status(401).json({ error: "Invalid notification token" });
-  }
-
   const pipelineData: PipelineData = req.body;
 
   if (!pipelineData.status || !pipelineData.branch || !pipelineData.runUrl) {

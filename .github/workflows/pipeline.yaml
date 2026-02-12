@@ -441,10 +441,9 @@ jobs:
           # For local testing, you can use ngrok or similar
           # For production, set this as a GitHub secret
           AUTH_URL="${{ secrets.AUTH_SERVICE_URL || 'http://localhost:3000' }}"
-          
+
           response=$(curl -s -w "\n%{http_code}" -X POST \
             -H "Content-Type: application/json" \
-            -H "X-Pipeline-Token: ${{ secrets.PIPELINE_NOTIFICATION_TOKEN }}" \
             -d @payload.json \
             "$AUTH_URL/pipeline/notify" 2>&1 || echo -e "\n000")
 
