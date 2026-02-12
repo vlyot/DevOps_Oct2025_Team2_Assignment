@@ -117,7 +117,7 @@ jobs:
           # Send notification (continue even if curl fails)
           curl -v -X POST http://localhost:3001/notify/pipeline \
             -H "Content-Type: application/json" \
-            -H "X-Webhook-Token: test-token" \
+            -H "X-Webhook-Token: ${{ env.WEBHOOK_TOKEN }}" \
             -d '{
               "status": "'"$STATUS"'",
               "workflowName": "Deploy to Staging",
