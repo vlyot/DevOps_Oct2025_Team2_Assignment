@@ -71,25 +71,31 @@ app.use(express.json());
 
 // Helper function to send Discord notifications
 async function notifyDiscord(endpoint: string, data: any): Promise<void> {
-  if (!process.env.DISCORD_NOTIFIER_URL || process.env.DISCORD_ENABLED !== 'true') {
+  if (
+    !process.env.DISCORD_NOTIFIER_URL ||
+    process.env.DISCORD_ENABLED !== "true"
+  ) {
     return;
   }
 
   try {
-    const response = await fetch(`${process.env.DISCORD_NOTIFIER_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Webhook-Token': process.env.WEBHOOK_TOKEN || ''
+    const response = await fetch(
+      `${process.env.DISCORD_NOTIFIER_URL}${endpoint}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Webhook-Token": process.env.WEBHOOK_TOKEN || "",
+        },
+        body: JSON.stringify(data),
       },
-      body: JSON.stringify(data)
-    });
+    );
 
     if (!response.ok) {
-      console.error('[Discord] Notification failed:', response.statusText);
+      console.error("[Discord] Notification failed:", response.statusText);
     }
   } catch (error) {
-    console.error('[Discord] Notification error:', error);
+    console.error("[Discord] Notification error:", error);
   }
 }
 
@@ -128,7 +134,6 @@ async function notifyDiscord(endpoint: string, data: any): Promise<void> {
  *     security: []
  */
 app.post("/login", loginLimiter, login);
-
 
 /**
  * @swagger
@@ -309,45 +314,25 @@ app.get("/admin/users", requireAuth, requireAdmin, async (req, res) => {
  *         $ref: '#/components/responses/InternalServerError'
  */
 // DELETE route - Remove a user
-app.delete(
-  "/admin/users/email/:email",
-  requireAuth,
-  requireAdmin,
-  async (req, res) => {
-    const { email } = req.params;
+app.delete("/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  // Force 'id' to be treated as a string
+  const id = req.params.id as string;
 
-    try {
-      // 1. Find the user by email first to get their UUID
-      const { data: listData, error: listError } =
-        await supabaseAdmin.auth.admin.listUsers();
+  try {
+    // Now TypeScript knows 'id' is a string and won't throw an error
+    const { error: deleteError } =
+      await supabaseAdmin.auth.admin.deleteUser(id);
 
-      if (listError) throw listError;
+    if (deleteError) throw deleteError;
 
-      const userToDelete = listData.users.find((u) => u.email === email);
-
-      if (!userToDelete) {
-        return res
-          .status(404)
-          .json({ error: "User with this email not found" });
-      }
-
-      // 2. Delete the user using the UUID we just found
-      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
-        userToDelete.id,
-      );
-
-      if (deleteError) throw deleteError;
-
-      return res.status(200).json({
-        message: `User ${email} deleted successfully`,
-        id: userToDelete.id,
-      });
-    } catch (err: any) {
-      console.error("Delete Error:", err.message);
-      return res.status(500).json({ error: err.message });
-    }
-  },
-);
+    return res.status(200).json({
+      message: `User ${id} deleted successfully`,
+    });
+  } catch (err: any) {
+    console.error("Delete Error:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * @swagger
@@ -428,7 +413,7 @@ app.put(
       if (updateError) throw updateError;
 
       if (!updatedData.user) {
-        return res.status(500).json({ error: 'Failed to update user' });
+        return res.status(500).json({ error: "Failed to update user" });
       }
 
       return res.status(200).json({
@@ -443,7 +428,7 @@ app.put(
       console.error("Update Error:", err.message);
       return res.status(500).json({ error: err.message });
     }
-  }
+  },
 );
 
 /**
@@ -771,22 +756,22 @@ app.post("/pipeline/notify", async (req, res) => {
   try {
     console.log(`[Pipeline] Processing ${pipelineData.status} notification`);
 
-    await notifyDiscord('/notify/pipeline', {
+    await notifyDiscord("/notify/pipeline", {
       status: pipelineData.status,
-      workflowName: pipelineData.workflowName || 'Pipeline',
+      workflowName: pipelineData.workflowName || "Pipeline",
       branch: pipelineData.branch,
-      commit: pipelineData.commit || 'unknown',
-      actor: pipelineData.actor || 'system',
+      commit: pipelineData.commit || "unknown",
+      actor: pipelineData.actor || "system",
       duration: pipelineData.duration,
       runUrl: pipelineData.runUrl,
       timestamp: new Date().toISOString(),
       failedServices: pipelineData.failedServices,
-      securityFindings: pipelineData.securityFindings
+      securityFindings: pipelineData.securityFindings,
     });
 
     return res.status(200).json({
       message: "Pipeline notification processed",
-      status: pipelineData.status
+      status: pipelineData.status,
     });
   } catch (error: any) {
     console.error("[Pipeline] Notification error:", error);
