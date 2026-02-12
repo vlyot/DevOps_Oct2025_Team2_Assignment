@@ -40,16 +40,19 @@ jobs:
       - name: 🔄 Merge develop → main
         run: |
           git fetch origin develop
-          git merge origin/develop --no-ff -m "Release approved"
+          git merge origin/develop --no-ff -m "Release approved - ${{ github.event.release.tag_name }}"
 
       - name: 🏷️ Create Release Tag
         id: tag
         run: |
-          # Generate semantic version from commit count and timestamp
+          # Extract version from the RC tag and create production version
+          RC_TAG="${{ github.event.release.tag_name }}"
+          # Remove the RC suffix to create production tag (e.g., v0.0.0-rc.123.abc -> v1.0.0)
           COMMIT_COUNT=$(git rev-list --count HEAD)
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          RELEASE_TAG="v1.0.${COMMIT_COUNT}-${TIMESTAMP}"
-          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
+          RELEASE_TAG="v1.0.${COMMIT_COUNT}"
+
+          echo "Creating production tag ${RELEASE_TAG} from RC ${RC_TAG}"
+          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG} (from ${RC_TAG})"
           echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
 
       - name: 📤 Push to GitHub
