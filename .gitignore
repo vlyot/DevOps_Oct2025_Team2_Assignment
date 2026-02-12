@@ -5,7 +5,7 @@ package-lock.json
 # Test coverage
 coverage/
 *.lcov
-
+DevOps_Oct2025_T03_Team01_Assignment-main/
 # Environment variables
 .env
 .env.local

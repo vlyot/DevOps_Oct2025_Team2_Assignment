@@ -9,8 +9,6 @@ import validator from "validator";
 import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./config/swagger";
-import { emailService } from "./services/emailService";
-import { subscriberRepository } from "./repositories/subscriberRepository";
 import { PipelineData } from "./models/PipelineData";
 
 dotenv.config();
@@ -71,6 +69,30 @@ const loginLimiter = rateLimit({
 app.use(loginLimiter);
 app.use(cors());
 app.use(express.json());
+
+// Helper function to send Discord notifications
+async function notifyDiscord(endpoint: string, data: any): Promise<void> {
+  if (!process.env.DISCORD_NOTIFIER_URL || process.env.DISCORD_ENABLED !== 'true') {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${process.env.DISCORD_NOTIFIER_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Token': process.env.WEBHOOK_TOKEN || ''
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      console.error('[Discord] Notification failed:', response.statusText);
+    }
+  } catch (error) {
+    console.error('[Discord] Notification error:', error);
+  }
+}
 
 /**
  * @swagger
@@ -197,15 +219,6 @@ app.post("/admin/users", requireAuth, async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
 
-  // Send user created email notification
-  if (process.env.SEND_CREATE_EMAIL === "true") {
-    emailService
-      .sendUserCreatedEmail(email, role || "user")
-      .catch((err) =>
-        console.error("[Email] Failed to send user created email:", err)
-      );
-  }
-
   return res.status(201).json({
     id: data.user?.id,
     email: email,
@@ -284,16 +297,6 @@ app.get("/admin/users", requireAuth, async (req, res) => {
 
   console.log(`✅ Successfully fetched ${users.length} users.`);
 
-  // Send read email notification for audit trail
-  if (process.env.SEND_READ_EMAIL === "true") {
-    const requesterEmail = (req as any).user?.email || "admin@system";
-    emailService
-      .sendUserReadEmail(requesterEmail)
-      .catch((err) =>
-        console.error("[Email] Failed to send user read email:", err)
-      );
-  }
-
   return res.status(200).json(users);
 });
 
@@ -361,15 +364,6 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
 
     if (!userToDelete) {
       return res.status(404).json({ error: "User with this email not found" });
-    }
-
-    // Send deletion email BEFORE deleting user
-    if (process.env.SEND_DELETE_EMAIL === "true") {
-      await emailService
-        .sendUserDeletedEmail(email)
-        .catch((err) =>
-          console.error("[Email] Failed to send user deleted email:", err)
-        );
     }
 
     // 2. Delete the user using the UUID we just found
@@ -461,15 +455,6 @@ app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Send role updated email notification
-    if (process.env.SEND_UPDATE_EMAIL === "true") {
-      emailService
-        .sendUserUpdatedEmail(email, oldRole, role)
-        .catch((err) =>
-          console.error("[Email] Failed to send user updated email:", err)
-        );
-    }
-
     return res.status(200).json({
       message: `Role for ${email} updated to ${role}`,
       user: {
@@ -534,7 +519,7 @@ app.get("/dashboard/files", requireAuth, (_req, res) => {
 
 /**
  * @swagger
- * /subscribe:
+ * /pipeline/notify:
  *   post:
  *     summary: Subscribe to email notifications
  *     description: Subscribe an email address to receive notifications about all user CRUD operations. No authentication required.
@@ -809,22 +794,24 @@ app.post("/pipeline/notify", async (req, res) => {
   }
 
   try {
-    let emailsSent = 0;
+    console.log(`[Pipeline] Processing ${pipelineData.status} notification`);
 
-    if (pipelineData.status === 'success' && process.env.SEND_PIPELINE_SUCCESS_EMAIL === 'true') {
-      console.log('[Pipeline] Sending success notification');
-      emailsSent = await emailService.sendPipelineSuccessEmail(pipelineData);
-    } else if (pipelineData.status === 'failure' && process.env.SEND_PIPELINE_FAILURE_EMAIL === 'true') {
-      console.log('[Pipeline] Sending failure notification');
-      emailsSent = await emailService.sendPipelineFailureEmail(pipelineData);
-    } else {
-      console.log('[Pipeline] Notification skipped (feature flag disabled)');
-    }
+    await notifyDiscord('/notify/pipeline', {
+      status: pipelineData.status,
+      workflowName: pipelineData.workflowName || 'Pipeline',
+      branch: pipelineData.branch,
+      commit: pipelineData.commit || 'unknown',
+      actor: pipelineData.actor || 'system',
+      duration: pipelineData.duration,
+      runUrl: pipelineData.runUrl,
+      timestamp: new Date().toISOString(),
+      failedServices: pipelineData.failedServices,
+      securityFindings: pipelineData.securityFindings
+    });
 
     return res.status(200).json({
       message: "Pipeline notification processed",
-      status: pipelineData.status,
-      emailsSent: emailsSent
+      status: pipelineData.status
     });
   } catch (error: any) {
     console.error('[Pipeline] Notification error:', error);
@@ -832,18 +819,12 @@ app.post("/pipeline/notify", async (req, res) => {
   }
 });
 
-app.listen(3000, async () => {
+app.listen(3000, () => {
   console.log("🚀 Back to basics on port 3000");
 
-  // Verify email service connection
-  if (process.env.EMAIL_ENABLED === "true") {
-    const emailReady = await emailService.verifyConnection();
-    if (emailReady) {
-      console.log("📧 Email service ready");
-    } else {
-      console.warn("⚠️  Email service configured but connection failed");
-    }
+  if (process.env.DISCORD_ENABLED === "true") {
+    console.log("💬 Discord notifications enabled");
   } else {
-    console.log("📧 Email service disabled");
+    console.log("💬 Discord notifications disabled");
   }
 });
