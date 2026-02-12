@@ -50,7 +50,6 @@ jobs:
           fi
 
       # --- UNIT TESTS ---
-      # --- UNIT TESTS ---
       - name: 5. Run Unit Tests - ${{ matrix.service }}
         working-directory: ./services/${{ matrix.service }}
         env:
