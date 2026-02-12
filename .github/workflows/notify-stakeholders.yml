@@ -1,0 +1,102 @@
+name: Notify Stakeholders
+
+on:
+  workflow_run:
+    workflows: 
+      - "CI Quality Gate"
+      - "Security - SAST (Static Analysis)"
+      - "Security - SCA (Dependency Scan)"
+      - "Security - DAST (Dynamic Analysis)"
+      - "Build Artifacts"
+      - "Deploy to Staging"
+      - "Deploy to Production"
+    types:
+      - completed
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Custom notification message'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-notification:
+    name: Prepare Notification
+    runs-on: ubuntu-latest
+    outputs:
+      workflow_name: ${{ steps.extract.outputs.workflow_name }}
+      status: ${{ steps.extract.outputs.status }}
+      color: ${{ steps.extract.outputs.color }}
+      emoji: ${{ steps.extract.outputs.emoji }}
+    steps:
+      - name: 📋 Extract Information
+        id: extract
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            WORKFLOW_NAME="Custom Notification"
+            STATUS="info"
+          elif [ "${{ github.event_name }}" == "release" ]; then
+            WORKFLOW_NAME="Release Published"
+            STATUS="success"
+          else
+            WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+            STATUS="${{ github.event.workflow_run.conclusion }}"
+          fi
+          
+          echo "workflow_name=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          
+          case $STATUS in
+            "success") echo "color=3066993" >> $GITHUB_OUTPUT; echo "emoji=✅" >> $GITHUB_OUTPUT ;;
+            "failure") echo "color=15158332" >> $GITHUB_OUTPUT; echo "emoji=❌" >> $GITHUB_OUTPUT ;;
+            *) echo "color=3447003" >> $GITHUB_OUTPUT; echo "emoji=📋" >> $GITHUB_OUTPUT ;;
+          esac
+
+  notify-email:
+    name: Send Email Notification
+    runs-on: ubuntu-latest
+    needs: prepare-notification
+    steps:
+      - name: ✉️ Send Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          # SMTP configuration (still recommended to use secrets)
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+
+          # --- HARD-CODED EMAIL ADDRESSES ---
+          # Replace with your own email address
+          to: "junyangatnp@gmail.com"
+          from: "junyanglim725@gmail.com"
+
+          # --- ORIGINAL SECRET-BASED VERSION (COMMENTED OUT) ---
+          # to: ${{ secrets.NOTIFY_EMAIL_TO }}          # e.g. you@domain.com
+          # from: ${{ secrets.NOTIFY_EMAIL_FROM }}      # e.g. ci-bot@domain.com
+
+          secure: true
+
+          subject: >
+            [DevSecOps] ${{ needs.prepare-notification.outputs.emoji }}
+            ${{ needs.prepare-notification.outputs.workflow_name }}
+            - ${{ needs.prepare-notification.outputs.status }}
+
+          body: |
+            DevSecOps Pipeline Update
+
+            Workflow: ${{ needs.prepare-notification.outputs.workflow_name }}
+            Status:   ${{ needs.prepare-notification.outputs.status }}
+            Branch:   ${{ github.ref_name }}
+            Actor:    ${{ github.actor }}
+            Commit:   ${{ github.sha }}
+
+            Repository: ${{ github.repository }}
+            Run URL:   https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            This message was sent automatically by GitHub Actions.
