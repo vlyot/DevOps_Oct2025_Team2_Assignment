@@ -1,10 +1,11 @@
 name: Security - SAST (Static Analysis)
 
+
 on:
   push:
-    branches: [ "feat/testing-pipelines" ]
+    branches: [ "develop" ]
   pull_request:
-    branches: [ "feat/testing-pipelines" ]
+    branches: [ "develop" ] # same branch as CI
   # (keep or remove schedule as you like)
 
 
@@ -204,6 +205,10 @@ jobs:
           echo "- **JSON Report** - Machine-readable data" >> $GITHUB_STEP_SUMMARY
           echo "- **SARIF Report** - GitHub Security integration" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the **Security tab** for SARIF findings" >> $GITHUB_STEP_SUMMARY
+          echo "2. Download HTML report for detailed analysis" >> $GITHUB_STEP_SUMMARY
+          echo "3. Address HIGH/CRITICAL vulnerabilities before merging" >> $GITHUB_STEP_SUMMARY
           echo "### 🔍 Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. Check the **Security tab** for SARIF findings" >> $GITHUB_STEP_SUMMARY
           echo "2. Download HTML report for detailed analysis" >> $GITHUB_STEP_SUMMARY
