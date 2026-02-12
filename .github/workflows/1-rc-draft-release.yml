@@ -1,28 +1,26 @@
-name: 1️⃣ RC Draft Release
+name: "1️⃣ RC Draft Release"
 
 on:
-  workflow_dispatch:  # Can manually run if needed
-  # DISABLED: Automatic trigger (now handled by CI Quality Gate)
-  # workflow_run:
-  #   workflows: ["CI Quality Gate"]
-  #   types: [completed]
-  #   branches: ["develop"]
+  workflow_run:
+    workflows: ["CI Quality Gate"]
+    types: [completed]
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
-  rc-draft:
+  create-draft-release:
+    name: Create Draft Release
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop' }}
 
     steps:
-      - name: Checkout
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
-
-      # (optional) here you can add the API checks that SAST/SCA/DAST also succeeded
 
       - name: 🏷️ Generate RC Version
         id: version
@@ -41,6 +39,27 @@ jobs:
           body: |
             # Release Candidate
             **Version:** ${{ steps.version.outputs.rc_version }}
-            **Status:** Waiting for QA approval
+            **Status:** Waiting for team approval
+            **Branch:** develop
+            **Commit:** ${{ github.event.workflow_run.head_sha }}
+
+            ## What's Included
+            - ✅ All tests passed
+            - ✅ Code quality checks completed (ESLint)
+            - ✅ Unit tests completed with coverage
+            - ✅ Build artifacts created
+
+            ## CI Quality Gate
+            Review the test reports in the [CI Quality Gate workflow](${{ github.event.workflow_run.html_url }})
+
+            ## To Approve & Deploy
+            1. Review test results and quality reports
+            2. Edit this release
+            3. Click **Publish release**
+
+            Publishing will trigger:
+            - ✅ Merge to `main` branch
+            - 🏷️ Production version tag creation
+            - 🚀 Automatic deployment to staging
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
