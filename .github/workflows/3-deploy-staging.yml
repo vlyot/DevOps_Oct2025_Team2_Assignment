@@ -91,25 +91,27 @@ jobs:
         run: |
           npm ci
 
-      - name: ✅ Run Health Checks
+      - name: ✅ Build & Verify All Services
         run: |
-          echo "🏥 Verifying health check endpoints..."
+          echo "🏥 Building and verifying all services..."
 
-          # Auth service health check
+          # Auth service
           cd services/auth
           npm ci
-          npm run build || true
-          echo "✅ Auth service ready"
+          npm run build
+          echo "✅ Auth service built successfully"
 
+          # Frontend
           cd ../frontend
           npm ci
-          npm run build || true
-          echo "✅ Frontend ready"
+          npm run build
+          echo "✅ Frontend built successfully"
 
+          # Discord Notifier
           cd ../discord-notifier
           npm ci
-          npm run build || true
-          echo "✅ Discord notifier ready"
+          npm run build
+          echo "✅ Discord notifier built successfully"
 
       - name: 📊 Deployment Report
         run: |
