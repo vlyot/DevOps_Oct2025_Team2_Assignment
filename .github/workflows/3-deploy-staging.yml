@@ -65,7 +65,7 @@ jobs:
           echo "✅ Image push complete"
 
   deploy-to-staging:
-    name: Deploy to staging environment (Render.com)
+    name: Deploy to staging environment
     runs-on: ubuntu-latest
     needs: build-and-push-docker
     environment:
@@ -82,23 +82,54 @@ jobs:
           echo "version=${VERSION_TAG}" >> $GITHUB_OUTPUT
           echo "Deploying version: ${VERSION_TAG}"
 
-      - name: ⏳ Wait for Render deployment
+      - name: 🚀 Deploy to Staging via SSH
         run: |
-          echo "⏳ Render is auto-deploying from main branch..."
-          echo "Main branch contains the latest tagged version"
-          sleep 30
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.STAGING_SERVER_HOST }} >> ~/.ssh/known_hosts
+
+          ssh -i ~/.ssh/id_rsa ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SERVER_HOST }} << 'EOF'
+          set -e
+
+          VERSION_TAG="${{ steps.version.outputs.version }}"
+          echo "🚀 Deploying version ${VERSION_TAG} to staging..."
+
+          # Navigate to project directory
+          cd ~/devsecops-staging
+
+          # Login to Docker Hub
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+          # Pull latest images
+          docker pull ${{ secrets.DOCKER_USERNAME }}/devops-frontend:${VERSION_TAG}
+          docker pull ${{ secrets.DOCKER_USERNAME }}/devops-auth:${VERSION_TAG}
+          docker pull ${{ secrets.DOCKER_USERNAME }}/devops-discord-notifier:${VERSION_TAG}
+
+          # Stop old containers
+          docker-compose down || true
+
+          # Update docker-compose.yml with new version
+          sed -i "s|image:.*devops-frontend:.*|image: ${{ secrets.DOCKER_USERNAME }}/devops-frontend:${VERSION_TAG}|g" docker-compose.yml
+          sed -i "s|image:.*devops-auth:.*|image: ${{ secrets.DOCKER_USERNAME }}/devops-auth:${VERSION_TAG}|g" docker-compose.yml
+          sed -i "s|image:.*devops-discord-notifier:.*|image: ${{ secrets.DOCKER_USERNAME }}/devops-discord-notifier:${VERSION_TAG}|g" docker-compose.yml
+
+          # Start new containers
+          docker-compose up -d
+
+          echo "✅ Deployment complete - version ${VERSION_TAG}"
+          EOF
 
       - name: 🏥 Health Check - Frontend
         run: |
-          STAGING_URL="${{ secrets.RENDER_STAGING_URL }}"
-          echo "🏥 Checking frontend health at ${STAGING_URL}..."
+          echo "🏥 Checking frontend health at http://localhost..."
 
-          for i in {1..60}; do
-            if curl -sf "${STAGING_URL}/health" > /dev/null 2>&1; then
+          for i in {1..30}; do
+            if curl -sf http://${{ secrets.STAGING_SERVER_HOST }}/health > /dev/null 2>&1; then
               echo "✅ Frontend is healthy"
               exit 0
             fi
-            echo "Attempt $i/60 - Waiting for frontend to be ready..."
+            echo "Attempt $i/30 - Waiting for frontend to be ready..."
             sleep 2
           done
           echo "⚠️ Frontend health check inconclusive (may still be deploying)"
@@ -106,16 +137,14 @@ jobs:
 
       - name: 🏥 Health Check - Auth Service
         run: |
-          STAGING_URL="${{ secrets.RENDER_STAGING_URL }}"
-          AUTH_URL="${STAGING_URL}:3000"
-          echo "🏥 Checking auth service health at ${AUTH_URL}..."
+          echo "🏥 Checking auth service health at http://localhost:3000..."
 
-          for i in {1..60}; do
-            if curl -sf "${AUTH_URL}/health" > /dev/null 2>&1; then
+          for i in {1..30}; do
+            if curl -sf http://${{ secrets.STAGING_SERVER_HOST }}:3000/health > /dev/null 2>&1; then
               echo "✅ Auth service is healthy"
               exit 0
             fi
-            echo "Attempt $i/60 - Waiting for auth service to be ready..."
+            echo "Attempt $i/30 - Waiting for auth service to be ready..."
             sleep 2
           done
           echo "⚠️ Auth health check inconclusive (may still be deploying)"
@@ -125,9 +154,8 @@ jobs:
         if: always()
         run: |
           VERSION_TAG="${{ steps.version.outputs.version }}"
-          STAGING_URL="${{ secrets.RENDER_STAGING_URL }}"
           echo "📊 Staging Deployment Report"
           echo "Version: ${VERSION_TAG}"
-          echo "Staging URL: ${STAGING_URL}"
+          echo "Staging Server: ${{ secrets.STAGING_SERVER_HOST }}"
           echo "Timestamp: $(date -u)"
-          echo "Status: ✅ Pushed to Render (auto-deploying)"
+          echo "Status: ✅ Deployed to staging"
