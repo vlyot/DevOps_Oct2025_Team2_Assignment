@@ -25,8 +25,8 @@ jobs:
 
       - name: 🌳 Prepare main branch
         run: |
-          # Fetch the dev branch you are releasing FROM
-          git fetch origin feat/testing-pipelines
+          # Fetch the develop branch
+          git fetch origin develop
 
           # Ensure main exists
           if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
@@ -37,16 +37,18 @@ jobs:
             git checkout main
           fi
 
-      - name: 🔄 Merge dev → main
+      - name: 🔄 Merge develop → main
         run: |
-          git fetch origin feat/testing-pipelines
-          git merge origin/feat/testing-pipelines --no-ff -m "Release approved"
+          git fetch origin develop
+          git merge origin/develop --no-ff -m "Release approved"
 
       - name: 🏷️ Create Release Tag
         id: tag
         run: |
-          # TODO: choose your own versioning strategy
-          RELEASE_TAG="v1.0.0"
+          # Generate semantic version from commit count and timestamp
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          RELEASE_TAG="v1.0.${COMMIT_COUNT}-${TIMESTAMP}"
           git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
           echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
 
