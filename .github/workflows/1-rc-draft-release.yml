@@ -4,7 +4,8 @@ on:
   workflow_run:
     workflows: ["CI Quality Gate"]
     types: [completed]
-    branches: [develop]
+  workflow_dispatch:  # Allow manual trigger for testing
+
 
 permissions:
   contents: write
@@ -13,19 +14,24 @@ jobs:
   create-draft-release:
     name: Create Draft Release
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' & github.event.workflow_run.head_branch == 'develop') }}
+    # Note: Push event is only to register the workflow, actual execution requires workflow_dispatch or workflow_run
 
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'develop' || github.event.workflow_run.head_branch }}
           fetch-depth: 0
 
       - name: 🏷️ Generate RC Version
         id: version
         run: |
-          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            SHORT_SHA=$(git rev-parse --short HEAD)
+          else
+            SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          fi
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           RC_VERSION="v0.0.0-rc.${TIMESTAMP}.${SHORT_SHA}"
           echo "rc_version=${RC_VERSION}" >> $GITHUB_OUTPUT
@@ -41,7 +47,8 @@ jobs:
             **Version:** ${{ steps.version.outputs.rc_version }}
             **Status:** Waiting for team approval
             **Branch:** develop
-            **Commit:** ${{ github.event.workflow_run.head_sha }}
+            **Commit:** ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+            **Triggered by:** ${{ github.event_name == 'workflow_dispatch' && 'Manual' || 'CI Quality Gate' }}
 
             ## What's Included
             - ✅ All tests passed
@@ -49,17 +56,11 @@ jobs:
             - ✅ Unit tests completed with coverage
             - ✅ Build artifacts created
 
-            ## CI Quality Gate
-            Review the test reports in the [CI Quality Gate workflow](${{ github.event.workflow_run.html_url }})
+            ## To Approve
+            ${{ github.event_name == 'workflow_run' && format('Review the test reports in the [CI Quality Gate workflow]({0}), then:', github.event.workflow_run.html_url) || 'Review the latest test reports in the Actions tab, then:' }}
+            1. Edit this release
+            2. Click **Publish release**
 
-            ## To Approve & Deploy
-            1. Review test results and quality reports
-            2. Edit this release
-            3. Click **Publish release**
-
-            Publishing will trigger:
-            - ✅ Merge to `main` branch
-            - 🏷️ Production version tag creation
-            - 🚀 Automatic deployment to staging
+            This will trigger the merge to `main` and deployment to staging.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
