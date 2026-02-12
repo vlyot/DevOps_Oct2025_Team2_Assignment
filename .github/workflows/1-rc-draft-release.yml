@@ -1,10 +1,12 @@
 name: 1️⃣ RC Draft Release
 
 on:
-  workflow_run:
-    workflows: ["CI Quality Gate"]
-    types: [completed]
-    branches: ["develop"]   # or develop
+  workflow_dispatch:  # Can manually run if needed
+  # DISABLED: Automatic trigger (now handled by CI Quality Gate)
+  # workflow_run:
+  #   workflows: ["CI Quality Gate"]
+  #   types: [completed]
+  #   branches: ["develop"]
 
 permissions:
   contents: write
