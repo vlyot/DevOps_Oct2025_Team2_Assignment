@@ -309,8 +309,10 @@ jobs:
           cat > .env << EOF
           SUPABASE_URL=https://dummy.supabase.co
           SUPABASE_ANON_KEY=dummy-key-for-scanning
-          JWT_SECRET=test-secret-for-dast-only
+          SUPABASE_SERVICE_ROLE_KEY=dummy-service-role-key-for-scanning
+          JWT_SECRET=test-secret-for-dast-only-must-be-at-least-32-characters-long
           PORT=3000
+          DISCORD_ENABLED=false
           EOF
 
           # Start service in background
