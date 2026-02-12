@@ -1,0 +1,103 @@
+version: "3.9"
+
+# Staging Environment - Uses pre-built Docker images from registry
+# Images are pulled from Docker Hub during deployment
+
+services:
+  discord-notifier:
+    image: ${DOCKER_USERNAME}/devops-discord-notifier:staging-latest
+    container_name: devsecops-staging-discord-notifier
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=staging
+      - LOG_LEVEL=info
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+    networks:
+      - devsecops-staging-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+  auth:
+    image: ${DOCKER_USERNAME}/devops-auth:staging-latest
+    container_name: devsecops-staging-auth
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=staging
+      - LOG_LEVEL=info
+      - DATABASE_URL=${DATABASE_URL:-postgresql://user:password@localhost/devsecops_staging}
+      - JWT_SECRET=${JWT_SECRET}
+      - SUPABASE_URL=${VITE_SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    volumes:
+      - staging-auth-uploads:/app/uploads
+    networks:
+      - devsecops-staging-network
+    depends_on:
+      discord-notifier:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+  frontend:
+    image: ${DOCKER_USERNAME}/devops-frontend:staging-latest
+    container_name: devsecops-staging-frontend
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=staging
+    networks:
+      - devsecops-staging-network
+    depends_on:
+      auth:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+networks:
+  devsecops-staging-network:
+    driver: bridge
+    name: devsecops-staging-network
+
+volumes:
+  staging-auth-uploads:
