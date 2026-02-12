@@ -17,6 +17,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     }
 
     // 3. Verify the token with Supabase
+    // This also retrieves the user's latest metadata (including role)
     const { data, error } = await supabase.auth.getUser(token);
 
     if (error || !data.user) {
@@ -24,8 +25,28 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         return res.status(403).json({ error: "Invalid or Expired Token" });
     }
 
-    // 4. Token is good! Attach user to request and proceed
-    (req as any).user = data.user;
+    // 4. Attach formatted user data to request
+    // We explicitly extract the ID and the role from user_metadata
+    (req as any).user = {
+        id: data.user.id,
+        email: data.user.email,
+        role: data.user.user_metadata?.role || 'user' // Default to 'user' if not set
+    };
+
+    next();
+};
+
+/**
+ * OPTIONAL: Role-Based Access Control (RBAC)
+ * Use this to restrict certain routes to 'admin' only
+ */
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
+
+    if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: "Access denied. Admin rights required." });
+    }
+
     next();
 };
 

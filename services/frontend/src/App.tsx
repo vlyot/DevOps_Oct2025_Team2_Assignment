@@ -1,18 +1,27 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import AdminPage from "./pages/AdminPage";
-import { UserDashboard } from "./pages/user/UserDashboard";
+import { Login } from "./pages/Login";
+import { AdminPage } from "./pages/AdminPage"; // Import PAGE
+import { UserDashboard } from "./pages/UserDashboard"; // Import PAGE
+import { ProtectedRoute } from "./app/routes/ProtectedRoute";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" />} />
-
         <Route path="/login" element={<Login />} />
 
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/dashboard" element={<UserDashboard />} />
+        {/* Admin Route - Only accessible by 'admin' role */}
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin" element={<AdminPage />} />
+        </Route>
+
+        {/* User Route - Accessible by 'user' and 'admin' */}
+        <Route element={<ProtectedRoute allowedRoles={["user", "admin"]} />}>
+          <Route path="/dashboard" element={<UserDashboard />} />
+        </Route>
+
+        {/* Redirect root to login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );
