@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: './services/${{ matrix.service }}/package-lock.json'
+          cache-dependency-path: 'services/${{ matrix.service }}/package-lock.json'
 
       - name: 📦 Install Dependencies
         working-directory: ./services/${{ matrix.service }}
