@@ -435,45 +435,96 @@ jobs:
 
       - name: Send Discord Notification
         continue-on-error: true
+        env:
+          WEBHOOK_QA: ${{ secrets.DISCORD_WEBHOOK_QA }}
+          WEBHOOK_DEV: ${{ secrets.DISCORD_WEBHOOK_DEVELOPER }}
+          WEBHOOK_STAKEHOLDER: ${{ secrets.DISCORD_WEBHOOK_STAKEHOLDER }}
         run: |
-          cat > payload.json <<'PAYLOAD_EOF'
-          {
-            "status": "${{ steps.status.outputs.pipeline_status }}",
-            "workflowName": "DevSecOps Pipeline - ${{ steps.status.outputs.event_description }}",
-            "branch": "${{ github.ref_name }}",
-            "commit": "${{ github.sha }}",
-            "actor": "${{ github.actor }}",
-            "runUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "duration": "~15 minutes",
-            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          }
-          PAYLOAD_EOF
-
           echo "💬 Sending Discord pipeline notification..."
 
-          # NOTE: Update DISCORD_NOTIFIER_URL to your deployed Discord service URL
-          # For local testing, you can use ngrok or similar
-          # For production, set this as a GitHub secret
-          DISCORD_URL="${{ secrets.DISCORD_NOTIFIER_URL || 'http://localhost:3001' }}"
-          WEBHOOK_TOKEN="${{ secrets.WEBHOOK_TOKEN }}"
+          STATUS="${{ steps.status.outputs.pipeline_status }}"
+          WORKFLOW_NAME="DevSecOps Pipeline - ${{ steps.status.outputs.event_description }}"
 
-          response=$(curl -s -w "\n%{http_code}" -X POST \
-            -H "Content-Type: application/json" \
-            -H "X-Webhook-Token: $WEBHOOK_TOKEN" \
-            -d @payload.json \
-            "$DISCORD_URL/notify/pipeline" 2>&1 || echo -e "\n000")
-
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
-
-          if [ "$http_code" -eq 200 ]; then
-            echo "✅ Discord notification sent successfully"
-            echo "$body"
+          # Build Discord embed
+          if [ "$STATUS" == "success" ]; then
+            COLOR=5763719  # Green
+            EMOJI="✅"
+            TITLE="Pipeline Success"
           else
-            echo "⚠️  Discord notification failed (HTTP $http_code)"
-            echo "$body"
-            echo "Note: This does not affect pipeline status"
+            COLOR=15548997  # Red
+            EMOJI="❌"
+            TITLE="Pipeline Failure"
           fi
+
+          # Create Discord embed payload
+          cat > discord_payload.json <<EOF
+          {
+            "embeds": [{
+              "title": "$EMOJI $TITLE",
+              "description": "**$WORKFLOW_NAME**",
+              "color": $COLOR,
+              "fields": [
+                {
+                  "name": "📋 Workflow",
+                  "value": "${{ github.workflow }}",
+                  "inline": true
+                },
+                {
+                  "name": "🌿 Branch",
+                  "value": "\`${{ github.ref_name }}\`",
+                  "inline": true
+                },
+                {
+                  "name": "👤 Actor",
+                  "value": "${{ github.actor }}",
+                  "inline": true
+                },
+                {
+                  "name": "📝 Commit",
+                  "value": "\`${GITHUB_SHA:0:7}\`",
+                  "inline": true
+                },
+                {
+                  "name": "🔗 Run URL",
+                  "value": "[View Pipeline](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                }
+              ],
+              "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            }]
+          }
+          EOF
+
+          # Send to QA and Developer (always)
+          for WEBHOOK in "$WEBHOOK_QA" "$WEBHOOK_DEV"; do
+            if [ -n "$WEBHOOK" ]; then
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "Content-Type: application/json" \
+                -d @discord_payload.json \
+                "$WEBHOOK")
+
+              if [ "$HTTP_CODE" -eq 204 ]; then
+                echo "✅ Notification sent successfully (HTTP $HTTP_CODE)"
+              else
+                echo "⚠️  Notification failed (HTTP $HTTP_CODE)"
+              fi
+            fi
+          done
+
+          # Send to Stakeholder (only on success)
+          if [ "$STATUS" == "success" ] && [ -n "$WEBHOOK_STAKEHOLDER" ]; then
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Content-Type: application/json" \
+              -d @discord_payload.json \
+              "$WEBHOOK_STAKEHOLDER")
+
+            if [ "$HTTP_CODE" -eq 204 ]; then
+              echo "✅ Stakeholder notification sent successfully (HTTP $HTTP_CODE)"
+            else
+              echo "⚠️  Stakeholder notification failed (HTTP $HTTP_CODE)"
+            fi
+          fi
+
+          echo "✅ Discord notification process completed"
 
 
    # --- THE QA GATE: Only triggers on your branch for testing ---
