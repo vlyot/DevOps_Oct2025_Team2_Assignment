@@ -1,25 +1,9 @@
 export function validateEnv(): void {
-  const required = ['WEBHOOK_TOKEN'];
-
-  const missing = required.filter(key => !process.env[key]);
-
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-  }
-
-  if (process.env.DISCORD_ENABLED === 'true') {
-    const webhooks = [
-      'DISCORD_WEBHOOK_QA',
-      'DISCORD_WEBHOOK_DEVELOPER',
-      'DISCORD_WEBHOOK_STAKEHOLDER'
-    ];
-
-    const missingWebhooks = webhooks.filter(key => !process.env[key]);
-
-    if (missingWebhooks.length > 0) {
-      console.warn(`⚠️  Warning: Discord enabled but missing webhooks: ${missingWebhooks.join(', ')}`);
-    }
+  // Webhook URLs are hardcoded, only token validation needed
+  if (!process.env.WEBHOOK_TOKEN) {
+    console.warn('⚠️  Warning: WEBHOOK_TOKEN not set, authentication will be weak');
   }
 
   console.log('✅ Environment variables validated');
+  console.log('📡 Discord webhooks: hardcoded (QA, Dev, Stakeholder)');
 }

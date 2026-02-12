@@ -10,10 +10,11 @@ export class DiscordService {
   };
 
   constructor() {
+    // Hardcoded Discord webhook URLs
     this.webhookUrls = {
-      qa: process.env.DISCORD_WEBHOOK_QA || '',
-      developer: process.env.DISCORD_WEBHOOK_DEVELOPER || '',
-      stakeholder: process.env.DISCORD_WEBHOOK_STAKEHOLDER || ''
+      qa: 'https://discord.com/api/webhooks/1471463573413826713/Y0kYWtnwt-VthxI69NhZBW7yOn_4iOyjcqw4RX8aBc7i_870qc5lA83rOliRY5trx8Sc',
+      developer: 'https://discord.com/api/webhooks/1471463992626249781/BG1Oj_POf-aPi-__qoyLCF002yRjtZdDrnXc2S6cXm65M-y2VKf-9iDD3CsfVIkQdDqI',
+      stakeholder: 'https://discord.com/api/webhooks/1471463797607895233/-MibfyL-AGysGl5YkdSwFEL1tdXajabBu3Vn2oaZFi5yCDrk2y99jJqhh-0TIt3wqOnf'
     };
   }
 
@@ -77,10 +78,16 @@ export class DiscordService {
   private getRoleWebhooks(status: 'success' | 'failure'): string[] {
     const webhooks: string[] = [];
 
-    // Send to all channels regardless of status
+    // QA: Always gets notifications (success and failure)
     if (this.webhookUrls.qa) webhooks.push(this.webhookUrls.qa);
+
+    // Developers: Always gets notifications (success and failure)
     if (this.webhookUrls.developer) webhooks.push(this.webhookUrls.developer);
-    if (this.webhookUrls.stakeholder) webhooks.push(this.webhookUrls.stakeholder);
+
+    // Stakeholders: Only gets success notifications
+    if (status === 'success' && this.webhookUrls.stakeholder) {
+      webhooks.push(this.webhookUrls.stakeholder);
+    }
 
     return webhooks;
   }
