@@ -4,12 +4,11 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install && npm cache clean --force
 
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm install typescript @types/node @types/express --save-dev && \
-    npm run build && \
+RUN npm run build && \
     npm prune --production
 
 # Stage 2: Runtime
