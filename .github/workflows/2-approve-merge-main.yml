@@ -23,10 +23,23 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "github-actions@github.com"
 
-      - name: 🌳 Prepare main branch
+      - name: 🌳 Prepare main branch & Detect Source Branch
+        id: branch
         run: |
-          # Fetch the dev branch you are releasing FROM
-          git fetch origin feat/testing-pipelines
+          # Get the branch from the release tag
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          SOURCE_BRANCH=$(git describe --all --contains "${RELEASE_TAG}" 2>/dev/null | sed 's|^remotes/origin/||' | head -1)
+
+          # Fallback to develop if can't determine from tag
+          if [ -z "$SOURCE_BRANCH" ] || [ "$SOURCE_BRANCH" == "HEAD" ]; then
+            SOURCE_BRANCH="develop"
+          fi
+
+          echo "Merging from branch: $SOURCE_BRANCH"
+          echo "source_branch=${SOURCE_BRANCH}" >> $GITHUB_OUTPUT
+
+          # Fetch the source branch
+          git fetch origin "$SOURCE_BRANCH"
 
           # Ensure main exists
           if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
@@ -39,8 +52,9 @@ jobs:
 
       - name: 🔄 Merge dev → main
         run: |
-          git fetch origin feat/testing-pipelines
-          git merge origin/feat/testing-pipelines --no-ff -m "Release approved"
+          SOURCE_BRANCH="${{ steps.branch.outputs.source_branch }}"
+          git fetch origin "$SOURCE_BRANCH"
+          git merge origin/"$SOURCE_BRANCH" --no-ff -m "Release approved from $SOURCE_BRANCH"
 
       - name: 🏷️ Create Release Tag
         id: tag
