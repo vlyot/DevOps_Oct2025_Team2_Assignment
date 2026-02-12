@@ -78,7 +78,7 @@ jobs:
 
       - name: 📦 Install Discord Notifier
         working-directory: ./services/discord-notifier
-        run: npm ci
+        run: npm install
 
       - name: 🔔 Send Notification
         working-directory: ./services/discord-notifier
