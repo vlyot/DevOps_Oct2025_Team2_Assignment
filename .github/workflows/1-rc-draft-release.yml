@@ -1,4 +1,4 @@
-name: 1️⃣ RC Draft Release
+name: "1️⃣ RC Draft Release"
 
 on:
   workflow_run:
@@ -6,6 +6,10 @@ on:
     types: [completed]
     branches: [develop]
   workflow_dispatch:  # Allow manual trigger for testing
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/1-rc-draft-release.yml'  # Trigger on self-modification to register
 
 permissions:
   contents: write
@@ -15,6 +19,7 @@ jobs:
     name: Create Draft Release
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Note: Push event is only to register the workflow, actual execution requires workflow_dispatch or workflow_run
 
     steps:
       - name: 📥 Checkout code
