@@ -5,17 +5,13 @@ This guide explains how to set up automated deployment to Render.com using Git i
 ## Architecture
 
 ```
-Push to main branch
+Code pushed to develop
          ↓
-Create & push tag (v1.0.x)
+Publish draft release (manual approval)
          ↓
-Workflow 3: Deploy to Staging
+Merge develop → main + create tag
          ↓
-Push to 'staging' branch
-         ↓
-Render.com detects push
-         ↓
-Auto-deploy to staging services
+Render.com auto-deploys from main
          ↓
 Health checks verify deployment
 ```
@@ -134,17 +130,17 @@ Publish Release → Merge (30s) → Deploy (2-5 min) → Health Checks (1 min)
 Total: ~3-6 minutes from approval to live staging
 ```
 
-## 4. Manual Deployment (if needed)
+## 4. How Render Auto-Deploys
 
-If you need to deploy without going through the full workflow:
+Render is configured to watch your `main` branch and automatically deploy whenever it changes:
 
-```bash
-# Push directly to staging branch
-git push origin main:staging --force
+1. **Workflow 2** merges develop → main
+2. **Workflow 2** pushes new tag to GitHub
+3. Render detects the push to `main` branch
+4. Render auto-starts deployment of all 3 services
+5. Services restart with latest code from `main`
 
-# Render will auto-deploy
-# Check Render dashboard for deployment progress
-```
+**No manual deployment needed** - it's completely automatic!
 
 ## 5. Monitoring Deployment
 

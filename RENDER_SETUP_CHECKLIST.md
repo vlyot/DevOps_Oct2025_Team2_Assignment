@@ -15,7 +15,7 @@ Quick setup guide to get staging deployment working with Render.com.
 - [ ] **Connect Repository**: Select your DevOps repo
 - [ ] **Name**: `devsecops-staging-frontend`
 - [ ] **Environment**: Docker
-- [ ] **Branch**: `staging`
+- [ ] **Branch**: `main`
 - [ ] **Root Directory**: Leave empty
 - [ ] Add **Environment Variables**:
   ```
@@ -33,7 +33,7 @@ Quick setup guide to get staging deployment working with Render.com.
 - [ ] **Connect Repository**: Same repo
 - [ ] **Name**: `devsecops-staging-auth`
 - [ ] **Environment**: Docker
-- [ ] **Branch**: `staging`
+- [ ] **Branch**: `main`
 - [ ] **Root Directory**: `services/auth`
 - [ ] Add **Environment Variables**:
   ```
@@ -51,7 +51,7 @@ Quick setup guide to get staging deployment working with Render.com.
 - [ ] **Connect Repository**: Same repo
 - [ ] **Name**: `devsecops-staging-discord-notifier`
 - [ ] **Environment**: Docker
-- [ ] **Branch**: `staging`
+- [ ] **Branch**: `main`
 - [ ] **Root Directory**: `services/discord-notifier`
 - [ ] Add **Environment Variables**:
   ```

@@ -82,25 +82,10 @@ jobs:
           echo "version=${VERSION_TAG}" >> $GITHUB_OUTPUT
           echo "Deploying version: ${VERSION_TAG}"
 
-      - name: 📤 Push to staging branch (triggers Render auto-deploy)
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "github-actions@github.com"
-
-          # Fetch all remotes
-          git fetch origin
-
-          # Create or update staging branch from main
-          git checkout -b staging origin/main || git checkout staging
-          git reset --hard origin/main
-
-          # Push staging branch to trigger Render auto-deployment
-          git push origin staging --force
-          echo "✅ Pushed to staging branch - Render will auto-deploy"
-
       - name: ⏳ Wait for Render deployment
         run: |
-          echo "⏳ Waiting for Render to process deployment..."
+          echo "⏳ Render is auto-deploying from main branch..."
+          echo "Main branch contains the latest tagged version"
           sleep 30
 
       - name: 🏥 Health Check - Frontend
