@@ -1,74 +1,82 @@
-import type { User } from '../types/user';
-import { supabase } from '../../supabaseClient';
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// Fetch all users
-export async function fetchUsers(): Promise<User[]> {
-    const { data, error } = await supabase
-        .from('users')
-        .select('*');
+export const createUser = async (userData: any) => {
+  const token = localStorage.getItem("token");
 
-    if (error) {
-        // console.error('Error fetching users:', error);
-        return [];
+  const response = await fetch(`${API_URL}/admin/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to create user");
+  return data;
+};
+
+export const fetchUsers = async () => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_URL}/admin/users`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to fetch users");
+
+  return data;
+};
+
+export const deactivateUser = async (userId: string) => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_URL}/admin/users/${userId}/deactivate`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to deactivate user");
+
+  return data;
+};
+
+export const deleteUserByEmail = async (email: string) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/admin/users/email/${email}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete user');
     }
+    return true;
+};
 
-    return data as User[] ?? [];
-}
+export const updateUserRoleByEmail = async (email: string, newRole: string) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/admin/users/email/${email}/role`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ role: newRole })
+    });
 
-export async function createUser(payload: {
-    email: string;
-    full_name?: string;
-    password: string;
-    role: 'admin' | 'user';
-    }): Promise<void> {
-    try {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: payload.email,
-        password: payload.password,
-        });
-
-        if (authError || !authData.user) {
-        throw new Error('Failed to create auth user');
-        }
-
-        const userId = authData.user.id;
-
-        const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-            id: userId,
-            email: payload.email,
-            full_name: payload.full_name ?? null,
-            role: payload.role,
-            is_active: true,
-        });
-        if (insertError) {
-            console.log(insertError)
-            throw new Error('Failed to create user in public.users');
-        }
-    } catch (err) {
-        throw err;
+    if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update role');
     }
-}
-
-// Deactive user
-// Currently, deleting user from this side of code requires supabase paid plan, so this is the current alternative
-export async function deactivateUser(userId: string): Promise<void> {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .update({
-        is_active: false,
-      })
-      .eq('id', userId)
-      .select('id, is_active');
-    
-    if (error) {
-      throw new Error('Failed to deactivate user');
-    }
-    console.log("User " + userId + " deleted")
-    console.log(data)
-  } catch (err) {
-    throw err;
-  }
-}
+    return await response.json();
+};

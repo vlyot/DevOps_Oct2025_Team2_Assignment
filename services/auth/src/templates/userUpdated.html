@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>User Account Updated</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff3cd; padding: 20px; border-radius: 5px; border-left: 4px solid #ffc107;">
+    <h1 style="color: #856404;">🔄 User Account Updated</h1>
+    <p>Hello Administrator,</p>
+    <p>A user account has been updated on the DevSecOps Platform.</p>
+
+    <div style="background-color: #ffffff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <p style="margin: 5px 0;"><strong>Action:</strong> <span style="color: #ffc107; font-weight: bold;">{{action}}</span></p>
+      <p style="margin: 5px 0;"><strong>Email:</strong> {{email}}</p>
+      <p style="margin: 5px 0;"><strong>Previous Role:</strong> {{oldRole}}</p>
+      <p style="margin: 5px 0;"><strong>New Role:</strong> {{newRole}}</p>
+      <p style="margin: 5px 0;"><strong>Timestamp:</strong> <script>document.write(new Date().toLocaleString())</script></p>
+    </div>
+
+    <p>The user's permissions have been changed. If you did not authorize this change, please investigate immediately.</p>
+
+    <hr style="border: 1px solid #ddd; margin: 20px 0;">
+    <p style="color: #666; font-size: 12px;">
+      This is an automated security notification from DevSecOps Platform. Please do not reply to this email.
+    </p>
+  </div>
+</body>
+</html>

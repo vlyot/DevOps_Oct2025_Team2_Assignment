@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import type { User } from "../../types/user";
 import {
   fetchUsers,
-  deleteUserByEmail,
-  updateUserRoleByEmail,
   createUser,
   deactivateUser,
+  deleteUserByEmail,
 } from "../../services/adminApi";
-import CreateUserForm from "./CreateUserForm";
+import { CreateUserForm } from "./CreateUserForm";
 import { UserTable } from "./UserTable";
 import "../../admin.css";
 
@@ -28,7 +27,6 @@ export function AdminDashboard() {
       const data = await fetchUsers();
       setUsers(data);
     } catch (err) {
-      // console.error(err);
       setError("Unable to load users");
     } finally {
       setLoading(false);
@@ -40,9 +38,8 @@ export function AdminDashboard() {
 
     try {
       setStatus("Deleting...");
-      await deleteUserByEmail(email); // Call the new email-based function
+      await deleteUserByEmail(email);
 
-      // Refresh the list from the server to ensure accuracy
       const updatedUsers = await fetchUsers();
       setUsers(updatedUsers);
 
@@ -95,7 +92,6 @@ export function AdminDashboard() {
           </div>
         </div>
       )}
-      {/* Header row */}
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
 
@@ -117,7 +113,6 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Table section */}
       <div className="table-section">
         <div className="table-header">
           <h2>Users</h2>
