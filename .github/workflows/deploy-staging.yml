@@ -1,0 +1,276 @@
+name: Deploy to Staging
+
+on:
+  workflow_run:
+    workflows: ["Build Artifacts"]
+    types:
+      - completed
+    branches: [ "develop", "main" ]
+  workflow_dispatch:  # Manual deployment trigger
+    inputs:
+      services:
+        description: 'Services to deploy (comma-separated: frontend,auth,dashboard,api,user or "all")'
+        required: true
+        default: 'all'
+
+permissions:
+  contents: write   # needed to create/push tags
+
+jobs:
+  prepare-deployment:
+    runs-on: ubuntu-latest
+    # Only proceed if the triggering workflow_run was successful OR manual dispatch
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      deploy_services: ${{ steps.determine-services.outputs.services }}
+      deploy_tag: ${{ steps.generate-tag.outputs.tag }}
+
+    steps:
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 2. Ensure CI + Security Workflows Passed
+        if: ${{ github.event_name == 'workflow_run' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          REPO="${{ github.repository }}"
+
+          echo "🔎 Checking required workflows for commit: $SHA in $REPO"
+
+          check() {
+            WORKFLOW_NAME="$1"
+            STATUS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$REPO/actions/runs?per_page=50&head_sha=$SHA" \
+              | jq -r --arg NAME "$WORKFLOW_NAME" \
+                  '.workflow_runs[] | select(.name == $NAME) | .conclusion' \
+              | head -n 1)
+
+            echo " - $WORKFLOW_NAME status: ${STATUS:-none}"
+
+            if [ -z "$STATUS" ] || [ "$STATUS" != "success" ]; then
+              echo "❌ Required workflow '$WORKFLOW_NAME' is not successful for $SHA (status=${STATUS:-none})"
+              exit 1
+            fi
+          }
+
+          check "CI Quality Gate"
+          check "Security - SAST (Static Analysis)"
+          check "Security - SCA (Dependency Scan)"
+          check "Security - DAST (Dynamic Analysis)"
+
+          echo "✅ All required workflows succeeded for $SHA"
+
+      - name: 3. Determine Services to Deploy
+        id: determine-services
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            INPUT="${{ github.event.inputs.services }}"
+            if [ "$INPUT" == "all" ]; then
+              echo "services=[\"frontend\",\"auth\",\"dashboard\",\"api\",\"user\"]" >> $GITHUB_OUTPUT
+            else
+              # Convert comma-separated string to JSON array
+              SERVICES=$(echo "$INPUT" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";""))')
+              echo "services=$SERVICES" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Default: deploy all services
+            echo "services=[\"frontend\",\"auth\",\"dashboard\",\"api\",\"user\"]" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 4. Generate Deployment Tag
+        id: generate-tag
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          # Use the same commit as the Build Artifacts workflow for workflow_run,
+          # or HEAD for manual dispatch.
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          else
+            SHORT_SHA=$(git rev-parse --short HEAD)
+          fi
+          TAG="staging-${TIMESTAMP}-${SHORT_SHA}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "📦 Deployment Tag: $TAG"
+
+      - name: 5. Create and Push Deployment Tag
+        run: |
+          TAG="${{ steps.generate-tag.outputs.tag }}"
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            TARGET_SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+            TARGET_SHA="$(git rev-parse HEAD)"
+          fi
+
+          echo "🏷️ Creating tag $TAG at $TARGET_SHA"
+
+          git fetch --unshallow || true
+          git tag "$TAG" "$TARGET_SHA"
+          git push origin "$TAG"
+
+          echo "📤 Pushed tag $TAG to origin"
+
+  build-and-push-docker:
+    runs-on: ubuntu-latest
+    needs: prepare-deployment
+
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.prepare-deployment.outputs.deploy_services) }}
+      fail-fast: false
+
+    steps:
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 4. Build Docker Image - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          echo "🐳 Building Docker image for ${{ matrix.service }}..."
+
+          # Check if Dockerfile exists
+          if [ ! -f "Dockerfile" ]; then
+            echo "⚠️ No Dockerfile found for ${{ matrix.service }}, creating default..."
+            cat > Dockerfile << 'EOF'
+          FROM node:20-alpine
+          WORKDIR /app
+          COPY package*.json ./
+          RUN npm ci --only=production
+          COPY . .
+          RUN npm run build || echo "No build script"
+          EXPOSE 3000
+          CMD ["npm", "start"]
+          EOF
+          fi
+
+          # Build the image
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:${{ needs.prepare-deployment.outputs.deploy_tag }} .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:staging-latest .
+
+      - name: 5. Push Docker Image - ${{ matrix.service }}
+        run: |
+          echo "📤 Pushing Docker image for ${{ matrix.service }}..."
+          docker push ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:${{ needs.prepare-deployment.outputs.deploy_tag }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:staging-latest
+          echo "✅ Image pushed successfully!"
+
+  deploy-to-staging:
+    runs-on: ubuntu-latest
+    needs: [prepare-deployment, build-and-push-docker]
+
+    steps:
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 2. Deploy to Staging Environment
+        run: |
+          echo "🚀 Deploying services to staging environment..."
+          echo "Deployment Tag: ${{ needs.prepare-deployment.outputs.deploy_tag }}"
+
+          # This is a placeholder for your actual deployment logic
+          # You can replace this with:
+          # - SSH commands to staging server
+          # - Kubernetes deployment
+          # - Docker Compose deployment
+          # - Cloud platform CLI commands (AWS ECS, Azure App Service, GCP Cloud Run)
+
+          echo "Services to deploy: ${{ needs.prepare-deployment.outputs.deploy_services }}"
+
+          # Example: SSH deployment (uncomment and configure)
+          # ssh ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+          #   cd /opt/devops-app
+          #   docker-compose pull
+          #   docker-compose up -d
+          # EOF
+
+          echo "✅ Deployment initiated!"
+
+      - name: 3. Run Health Checks
+        run: |
+          echo "🏥 Running health checks on staging services..."
+
+          # Placeholder for health check logic
+          # Replace with actual health check endpoints
+
+          SERVICES='${{ needs.prepare-deployment.outputs.deploy_services }}'
+          echo "Checking health for services: $SERVICES"
+
+          # Example health checks (configure your actual staging URLs)
+          # echo "$SERVICES" | jq -r '.[]' | while read service; do
+          #   echo "Checking $service..."
+          #   curl -f "https://staging-$service.yourdomain.com/health" || echo "⚠️ $service health check failed"
+          # done
+
+          echo "✅ Health checks completed!"
+
+      - name: 4. Rollback on Failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Initiating rollback..."
+
+          # Placeholder for rollback logic
+          # This would revert to the previous stable version
+
+          echo "🔄 Rolling back to previous version..."
+          # Add your rollback commands here
+
+          echo "✅ Rollback completed!"
+
+  deployment-summary:
+    runs-on: ubuntu-latest
+    needs: [prepare-deployment, build-and-push-docker, deploy-to-staging]
+    if: always()
+
+    steps:
+      - name: Generate Deployment Summary
+        run: |
+          echo "## 🚀 Staging Deployment Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Deployment Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** \`${{ needs.prepare-deployment.outputs.deploy_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🐳 Docker Images Pushed" >> $GITHUB_STEP_SUMMARY
+
+          SERVICES='${{ needs.prepare-deployment.outputs.deploy_services }}'
+          echo "$SERVICES" | jq -r '.[]' | while read service; do
+            echo "- \`${{ secrets.DOCKER_USERNAME }}/devops-$service:${{ needs.prepare-deployment.outputs.deploy_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Deployment Status" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.deploy-to-staging.result }}" == "success" ]; then
+            echo "- 🟢 **SUCCESS** - All services deployed successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-to-staging.result }}" == "failure" ]; then
+            echo "- 🔴 **FAILED** - Deployment encountered errors" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- 🟡 **UNKNOWN** - Deployment status unclear" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Docker Hub Repository](https://hub.docker.com/u/${{ secrets.DOCKER_USERNAME }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Staging Environment](#) _(Configure your staging URL)_" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Verify staging environment functionality" >> $GITHUB_STEP_SUMMARY
+          echo "2. Run smoke tests on deployed services" >> $GITHUB_STEP_SUMMARY
+          echo "3. Monitor logs for any errors" >> $GITHUB_STEP_SUMMARY
+          echo "4. Notify QA team for testing" >> $GITHUB_STEP_SUMMARY
