@@ -15,7 +15,7 @@ jobs:
     
     strategy:
       matrix:
-        service: [frontend, auth, dashboard, api, user]
+        service: [frontend, auth, discord-notifier]
       fail-fast: false  # Continue testing other services even if one fails
 
     steps:
