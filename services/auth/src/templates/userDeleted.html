@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>User Account Deleted</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f8d7da; padding: 20px; border-radius: 5px; border-left: 4px solid #dc3545;">
+    <h1 style="color: #721c24;">❌ User Account Deleted</h1>
+    <p>Hello Administrator,</p>
+    <p>A user account has been permanently deleted from the DevSecOps Platform.</p>
+
+    <div style="background-color: #ffffff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <p style="margin: 5px 0;"><strong>Action:</strong> <span style="color: #dc3545; font-weight: bold;">{{action}}</span></p>
+      <p style="margin: 5px 0;"><strong>Email:</strong> {{email}}</p>
+      <p style="margin: 5px 0;"><strong>Timestamp:</strong> <script>document.write(new Date().toLocaleString())</script></p>
+    </div>
+
+    <p>All user data has been removed from the system. This action cannot be undone.</p>
+
+    <hr style="border: 1px solid #ddd; margin: 20px 0;">
+    <p style="color: #666; font-size: 12px;">
+      This is a final automated notification from DevSecOps Platform. Please do not reply to this email.
+    </p>
+  </div>
+</body>
+</html>
