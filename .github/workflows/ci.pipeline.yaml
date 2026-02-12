@@ -1,7 +1,6 @@
 name: CI Quality Gate
 
 on:
-on:
   push:
     branches: [ "develop" ]
   pull_request:
