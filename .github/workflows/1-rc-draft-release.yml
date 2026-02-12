@@ -14,7 +14,7 @@ jobs:
   create-draft-release:
     name: Create Draft Release
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' & github.event.workflow_run.head_branch == 'develop') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop') }}
     # Note: Push event is only to register the workflow, actual execution requires workflow_dispatch or workflow_run
 
     steps:
