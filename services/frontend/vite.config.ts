@@ -6,10 +6,4 @@ export default defineConfig({
   server: {
     port: 5173,
   },
-  test: {
-    globals: true, // <--- This fixes "describe is not defined"
-    environment: "jsdom",
-    setupFiles: "./src/test/setup.ts", // <--- This runs your setup file
-    css: true,
-  },
 });

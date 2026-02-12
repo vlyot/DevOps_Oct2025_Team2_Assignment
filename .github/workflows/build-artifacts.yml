@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   build-services:
@@ -28,14 +29,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './services/${{ matrix.service }}/package-lock.json'
 
       - name: 📦 Install Dependencies
         working-directory: ./services/${{ matrix.service }}
         run: |
           echo "📦 Installing dependencies for ${{ matrix.service }}..."
-          npm ci
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: 🏗️ Build Service
         working-directory: ./services/${{ matrix.service }}
