@@ -10,11 +10,11 @@ export class DiscordService {
   };
 
   constructor() {
-    // Hardcoded Discord webhook URLs
+    // Discord webhook URLs from environment variables
     this.webhookUrls = {
-      qa: 'https://discord.com/api/webhooks/1471463573413826713/Y0kYWtnwt-VthxI69NhZBW7yOn_4iOyjcqw4RX8aBc7i_870qc5lA83rOliRY5trx8Sc',
-      developer: 'https://discord.com/api/webhooks/1471463992626249781/BG1Oj_POf-aPi-__qoyLCF002yRjtZdDrnXc2S6cXm65M-y2VKf-9iDD3CsfVIkQdDqI',
-      stakeholder: 'https://discord.com/api/webhooks/1471463797607895233/-MibfyL-AGysGl5YkdSwFEL1tdXajabBu3Vn2oaZFi5yCDrk2y99jJqhh-0TIt3wqOnf'
+      qa: process.env.DISCORD_WEBHOOK_QA || 'https://discord.com/api/webhooks/1471463573413826713/Y0kYWtnwt-VthxI69NhZBW7yOn_4iOyjcqw4RX8aBc7i_870qc5lA83rOliRY5trx8Sc',
+      developer: process.env.DISCORD_WEBHOOK_DEVELOPER || 'https://discord.com/api/webhooks/1471463992626249781/BG1Oj_POf-aPi-__qoyLCF002yRjtZdDrnXc2S6cXm65M-y2VKf-9iDD3CsfVIkQdDqI',
+      stakeholder: process.env.DISCORD_WEBHOOK_STAKEHOLDER || 'https://discord.com/api/webhooks/1471463797607895233/-MibfyL-AGysGl5YkdSwFEL1tdXajabBu3Vn2oaZFi5yCDrk2y99jJqhh-0TIt3wqOnf'
     };
   }
 

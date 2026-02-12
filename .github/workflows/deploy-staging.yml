@@ -90,11 +90,20 @@ jobs:
           DISCORD_ENABLED: 'true'
           SEND_PIPELINE_SUCCESS: 'true'
           SEND_PIPELINE_FAILURE: 'true'
+          DISCORD_WEBHOOK_QA: ${{ secrets.DISCORD_WEBHOOK_QA }}
+          DISCORD_WEBHOOK_DEVELOPER: ${{ secrets.DISCORD_WEBHOOK_DEVELOPER }}
+          DISCORD_WEBHOOK_STAKEHOLDER: ${{ secrets.DISCORD_WEBHOOK_STAKEHOLDER }}
         run: |
           # Start Discord notifier service
-          npm start &
+          npm start > /tmp/discord-service.log 2>&1 &
           NOTIFIER_PID=$!
+
+          # Wait for service to start and check if it's running
           sleep 5
+          if ! ps -p $NOTIFIER_PID > /dev/null 2>&1; then
+            echo "❌ Service failed to start. Logs:"
+            cat /tmp/discord-service.log
+          fi
 
           # Determine status
           if [ "${{ needs.build-and-push.result }}" == "success" ]; then
@@ -104,8 +113,8 @@ jobs:
             FAILED_SERVICES='["Check Actions tab for details"]'
           fi
 
-          # Send notification
-          curl -X POST http://localhost:3001/notify/pipeline \
+          # Send notification (continue even if curl fails)
+          curl -v -X POST http://localhost:3001/notify/pipeline \
             -H "Content-Type: application/json" \
             -H "X-Webhook-Token: test-token" \
             -d '{
@@ -117,10 +126,10 @@ jobs:
               "runUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
               "failedServices": '"${FAILED_SERVICES:-[]}"'
-            }'
+            }' || echo "⚠️ Notification request failed (service may not be running)"
 
           # Cleanup
-          kill $NOTIFIER_PID
+          kill $NOTIFIER_PID 2>/dev/null || true
 
   summary:
     name: Deployment Summary
