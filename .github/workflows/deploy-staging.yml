@@ -90,6 +90,7 @@ jobs:
           DISCORD_ENABLED: 'true'
           SEND_PIPELINE_SUCCESS: 'true'
           SEND_PIPELINE_FAILURE: 'true'
+          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
           DISCORD_WEBHOOK_QA: ${{ secrets.DISCORD_WEBHOOK_QA }}
           DISCORD_WEBHOOK_DEVELOPER: ${{ secrets.DISCORD_WEBHOOK_DEVELOPER }}
           DISCORD_WEBHOOK_STAKEHOLDER: ${{ secrets.DISCORD_WEBHOOK_STAKEHOLDER }}
