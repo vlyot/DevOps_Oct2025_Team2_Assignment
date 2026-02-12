@@ -23,23 +23,10 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "github-actions@github.com"
 
-      - name: 🌳 Prepare main branch & Detect Source Branch
-        id: branch
+      - name: 🌳 Prepare main branch
         run: |
-          # Get the branch from the release tag
-          RELEASE_TAG="${{ github.event.release.tag_name }}"
-          SOURCE_BRANCH=$(git describe --all --contains "${RELEASE_TAG}" 2>/dev/null | sed 's|^remotes/origin/||' | head -1)
-
-          # Fallback to develop if can't determine from tag
-          if [ -z "$SOURCE_BRANCH" ] || [ "$SOURCE_BRANCH" == "HEAD" ]; then
-            SOURCE_BRANCH="develop"
-          fi
-
-          echo "Merging from branch: $SOURCE_BRANCH"
-          echo "source_branch=${SOURCE_BRANCH}" >> $GITHUB_OUTPUT
-
-          # Fetch the source branch
-          git fetch origin "$SOURCE_BRANCH"
+          # Fetch the develop branch
+          git fetch origin develop
 
           # Ensure main exists
           if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
@@ -50,11 +37,10 @@ jobs:
             git checkout main
           fi
 
-      - name: 🔄 Merge dev → main
+      - name: 🔄 Merge develop → main
         run: |
-          SOURCE_BRANCH="${{ steps.branch.outputs.source_branch }}"
-          git fetch origin "$SOURCE_BRANCH"
-          git merge origin/"$SOURCE_BRANCH" --no-ff -m "Release approved from $SOURCE_BRANCH"
+          git fetch origin develop
+          git merge origin/develop --no-ff -m "Release approved"
 
       - name: 🏷️ Create Release Tag
         id: tag
