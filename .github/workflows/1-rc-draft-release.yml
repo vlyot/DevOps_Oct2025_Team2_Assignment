@@ -1,4 +1,4 @@
-name: "1️⃣ RC Draft Release"
+name: 1️⃣ RC Draft Release
 
 on:
   workflow_run:
@@ -10,8 +10,7 @@ permissions:
   actions: read
 
 jobs:
-  create-draft-release:
-    name: Create Draft Release
+  rc-draft:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop' }}
 
@@ -25,11 +24,8 @@ jobs:
       - name: 🏷️ Generate RC Version
         id: version
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            SHORT_SHA=$(git rev-parse --short HEAD)
-          else
-            SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
-          fi
+          # Use the SHA from the triggering event
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           RC_VERSION="v0.0.0-rc.${TIMESTAMP}.${SHORT_SHA}"
           echo "rc_version=${RC_VERSION}" >> $GITHUB_OUTPUT
@@ -39,6 +35,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.rc_version }}
+          target_commitish: ${{ github.event.workflow_run.head_sha }} # FIX: Ensure tag points to right commit
           draft: true
           body: |
             # Release Candidate
