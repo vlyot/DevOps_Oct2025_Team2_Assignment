@@ -1,0 +1,58 @@
+name: Code Quality - ESLint
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "develop", "main", "devops/*" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+
+jobs:
+  eslint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, auth, dashboard, api, user]
+      fail-fast: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "📦 Installing dependencies for ${{ matrix.service }}..."
+            npm install
+          else
+            echo "⚠️ No package.json found for ${{ matrix.service }}, skipping"
+            exit 0
+          fi
+
+      - name: Run ESLint - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "🔍 Running ESLint for ${{ matrix.service }}..."
+            npx eslint . --format html --output-file ../../eslint-${{ matrix.service }}.html || echo "ESLint completed with warnings"
+          fi
+
+      - name: Verify Reports Generated
+        if: always()
+        run: |
+          echo "Checking ESLint reports..."
+          ls -lah eslint-${{ matrix.service }}.html || echo "⚠️ Report not generated for ${{ matrix.service }}"
+
+      - name: Upload ESLint Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eslint-report-${{ matrix.service }}
+          path: eslint-${{ matrix.service }}.html
+          retention-days: 30

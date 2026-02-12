@@ -30,3 +30,6 @@ build/
 # Temporary files
 *.tmp
 .cache/
+
+# Team reference repositories
+DevOps_Oct2025_T03_Team01_Assignment-main/

@@ -1,0 +1,75 @@
+name: SCA - NPM Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "develop", "main", "devops/*" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, auth, dashboard, api, user]
+      fail-fast: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "📦 Installing dependencies for ${{ matrix.service }}..."
+            npm install
+          else
+            echo "⚠️ No package.json found for ${{ matrix.service }}, skipping"
+            exit 0
+          fi
+
+      - name: Run NPM Audit - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "🔒 Running dependency scan for ${{ matrix.service }}..."
+            npm install -g npm-audit-html
+            npm audit --json | npm-audit-html --output ../../sca-${{ matrix.service }}.html || true
+            npm audit --json > ../../sca-${{ matrix.service }}.json || true
+
+            echo "=== SCA Report for ${{ matrix.service }} ==="
+            ls -lh ../../sca-${{ matrix.service }}.html ../../sca-${{ matrix.service }}.json || echo "SCA reports missing"
+          fi
+
+      - name: Check for Critical Vulnerabilities (PR Only)
+        if: github.event_name == 'pull_request'
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "⚠️ Checking for CRITICAL vulnerabilities on PR..."
+            npm audit --audit-level=critical || echo "⚠️ Critical vulnerabilities found - please review!"
+          fi
+        continue-on-error: true
+
+      - name: Verify SCA Reports
+        if: always()
+        run: |
+          echo "Checking SCA reports..."
+          ls -lah sca-${{ matrix.service }}.html sca-${{ matrix.service }}.json || echo "⚠️ Reports not generated"
+
+      - name: Upload SCA Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sca-report-${{ matrix.service }}
+          path: |
+            sca-${{ matrix.service }}.html
+            sca-${{ matrix.service }}.json
+          retention-days: 30

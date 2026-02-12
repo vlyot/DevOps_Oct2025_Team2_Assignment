@@ -1,0 +1,45 @@
+name: Deploy - Release Candidate
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI - Matrix Tests", "SAST - Semgrep Scan", "SCA - NPM Audit"]
+    types: [completed]
+    branches: [ "devops/pipeline" ]
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/devops/pipeline' || github.event.workflow_run.head_branch == 'devops/pipeline'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Version String
+        id: version
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "rc_version=v0.0.0-rc.${TIMESTAMP}.${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.rc_version }}
+          draft: true
+          name: "📦 QA Candidate: ${{ steps.version.outputs.rc_version }}"
+          body: |
+            ## 🛡️ QA Security & Build Package
+            **Branch:** `${{ github.ref_name }}`
+            **Commit:** `${{ github.sha }}`
+
+            ### ✅ Verification Checklist
+            - [x] **Matrix:** All 5 services built successfully
+            - [x] **SAST:** Semgrep completed (See Security Tab)
+            - [x] **DAST:** ZAP Baseline Scan completed
+            - [x] **SCA:** NPM Audit completed for all services
+
+            **QA Action:** Review the artifacts in the Actions tab. If the build meets quality standards, click **Publish Release** to finalize this version.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

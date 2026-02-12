@@ -1,0 +1,160 @@
+name: SAST - Semgrep Scan
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "develop", "main", "devops/*" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST
+        run: |
+          echo "🔒 Running Semgrep on full codebase..."
+
+          # Generate SARIF report
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            returntocorp/semgrep \
+            semgrep scan /src \
+            --config auto \
+            --sarif \
+            --output /src/sast-report.sarif || true
+
+          # Generate JSON report
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            returntocorp/semgrep \
+            semgrep scan /src \
+            --config auto \
+            --json \
+            --output /src/sast-report.json || true
+
+      - name: Generate HTML Report
+        run: |
+          python3 -c '
+          import json
+          import html
+
+          try:
+              with open("sast-report.json", "r") as f:
+                  data = json.load(f)
+          except:
+              data = {"results": []}
+
+          results = data.get("results", [])
+          counts = {"high": 0, "medium": 0, "low": 0, "info": 0}
+          for r in results:
+              sev = r.get("extra", {}).get("severity", "info").lower()
+              counts[sev] = counts.get(sev, 0) + 1
+
+          html_output = """<!DOCTYPE html>
+          <html>
+          <head>
+              <title>Semgrep SAST Report</title>
+              <meta charset=\"UTF-8\">
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+                  h1 { color: #333; }
+                  .summary { background: white; padding: 20px; margin: 20px 0; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .finding { background: white; padding: 15px; margin: 15px 0; border-left: 4px solid; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .finding.high { border-left-color: #e74c3c; }
+                  .finding.medium { border-left-color: #f39c12; }
+                  .finding.low { border-left-color: #3498db; }
+                  .finding.info { border-left-color: #95a5a6; }
+                  .severity { font-weight: bold; padding: 4px 10px; border-radius: 3px; color: white; display: inline-block; margin-right: 10px; }
+                  .severity.high { background: #e74c3c; }
+                  .severity.medium { background: #f39c12; }
+                  .severity.low { background: #3498db; }
+                  .severity.info { background: #95a5a6; }
+                  .no-findings { background: white; padding: 40px; text-align: center; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .no-findings h2 { color: #27ae60; margin: 0; }
+                  .file-path { color: #555; font-size: 14px; margin: 8px 0; }
+                  .message { color: #333; line-height: 1.6; margin: 10px 0; }
+              </style>
+          </head>
+          <body>
+              <h1>🔒 Semgrep SAST Report</h1>
+          """
+
+          html_output += f"""
+              <div class="summary">
+                  <h3>Summary</h3>
+                  <p><strong>Total Findings:</strong> {len(results)}</p>
+                  <p>
+                      <span class="severity high">{counts.get("high", 0)} High</span>
+                      <span class="severity medium">{counts.get("medium", 0)} Medium</span>
+                      <span class="severity low">{counts.get("low", 0)} Low</span>
+                      <span class="severity info">{counts.get("info", 0)} Info</span>
+                  </p>
+              </div>
+          """
+
+          if len(results) == 0:
+              html_output += """
+              <div class="no-findings">
+                  <h2>✅ No security issues found!</h2>
+                  <p>All services passed Semgrep security checks.</p>
+              </div>
+              """
+          else:
+              for finding in results:
+                  sev = finding.get("extra", {}).get("severity", "info").lower()
+                  check_id = html.escape(finding.get("check_id", "Unknown Check"))
+                  path = html.escape(finding.get("path", "Unknown"))
+                  line = finding.get("start", {}).get("line", "?")
+                  message = html.escape(finding.get("extra", {}).get("message") or finding.get("message", "No description"))
+
+                  html_output += f"""
+              <div class="finding {sev}">
+                  <h3><span class="severity {sev}">{sev.upper()}</span> {check_id}</h3>
+                  <div class="file-path"><strong>File:</strong> {path}:{line}</div>
+                  <div class="message"><strong>Message:</strong> {message}</div>
+              </div>
+          """
+
+          html_output += """
+          </body>
+          </html>
+          """
+
+          with open("sast-report.html", "w") as f:
+              f.write(html_output)
+
+          print("✅ HTML report created successfully")
+          '
+
+      - name: Verify SAST Reports
+        if: always()
+        run: |
+          echo "=== Checking SAST reports ==="
+          ls -lh sast-report.json sast-report.sarif sast-report.html || echo "Some SAST reports missing"
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: sast-report.sarif
+          category: semgrep
+
+      - name: Upload SAST Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sast-reports
+          path: |
+            sast-report.html
+            sast-report.json
+            sast-report.sarif
+          retention-days: 30

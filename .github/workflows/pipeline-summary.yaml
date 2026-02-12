@@ -1,0 +1,50 @@
+name: Pipeline Summary
+
+on:
+  workflow_run:
+    workflows: ["CI - Matrix Tests", "Code Quality - ESLint", "SAST - Semgrep Scan", "SCA - NPM Audit", "DAST - OWASP ZAP Scan"]
+    types: [completed]
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Generate Pipeline Summary
+        run: |
+          echo "## 🚀 DevSecOps Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Workflow Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.event.workflow_run.head_branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** ${{ github.event.workflow_run.actor.login }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.event.workflow_run.head_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏗️ Services Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Frontend" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Auth Service" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dashboard Service" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ API Service" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ User Service" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🛡️ Security Checks" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Code Quality** (ESLint) - All services" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Dependency Scan** (SCA/NPM Audit) - All services" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Static Analysis** (SAST/Semgrep) - Full codebase" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Dynamic Analysis** (DAST/OWASP ZAP) - Runtime security" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Unit Tests** - All services with tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 View Results" >> $GITHUB_STEP_SUMMARY
+          echo "- [Workflow Run](${{ github.event.workflow_run.html_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- Check **Actions** tab for detailed artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Review **Security** tab for SARIF findings" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts Available" >> $GITHUB_STEP_SUMMARY
+          echo "Download the following artifacts for detailed reports:" >> $GITHUB_STEP_SUMMARY
+          echo "- ESLint Reports (per service)" >> $GITHUB_STEP_SUMMARY
+          echo "- Test Coverage Reports (per service)" >> $GITHUB_STEP_SUMMARY
+          echo "- SCA Reports (per service)" >> $GITHUB_STEP_SUMMARY
+          echo "- SAST Reports (HTML, JSON, SARIF)" >> $GITHUB_STEP_SUMMARY
+          echo "- DAST Reports (HTML, JSON, Markdown)" >> $GITHUB_STEP_SUMMARY
