@@ -33,7 +33,11 @@ jobs:
         working-directory: ./services/${{ matrix.service }}
         run: |
           echo "📦 Installing dependencies for ${{ matrix.service }}..."
-          npm ci
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: 🏗️ Build Service
         working-directory: ./services/${{ matrix.service }}
