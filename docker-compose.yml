@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   auth:
@@ -10,14 +10,26 @@ services:
       - "3000:3000"
     env_file:
       - ./services/auth/.env
+    # We add a volume to keep uploaded files if you are using local 'fs' storage
+    volumes:
+      - auth-uploads:/app/uploads
     networks:
       - devsecops-network
     restart: always
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      # Note: Ensure you have a GET /health endpoint in your Express index.ts
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+        ]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 40s
 
   frontend:
@@ -25,7 +37,10 @@ services:
       context: ./services/frontend
       dockerfile: Dockerfile
       args:
+        # These are CRITICAL. Vite needs them at build time to create the static files.
         - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     container_name: devsecops-frontend
     ports:
       - "80:80"
@@ -36,7 +51,17 @@ services:
         condition: service_healthy
     restart: always
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      # If your nginx.conf has the /health location we discussed, this works.
+      # Otherwise, use http://localhost/
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -46,3 +71,6 @@ networks:
   devsecops-network:
     driver: bridge
     name: devsecops-network
+
+volumes:
+  auth-uploads:
