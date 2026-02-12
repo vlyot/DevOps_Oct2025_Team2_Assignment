@@ -80,6 +80,10 @@ jobs:
         working-directory: ./services/discord-notifier
         run: npm install
 
+      - name: 🏗️ Build Discord Notifier
+        working-directory: ./services/discord-notifier
+        run: npm run build
+
       - name: 🔔 Send Notification
         working-directory: ./services/discord-notifier
         env:
