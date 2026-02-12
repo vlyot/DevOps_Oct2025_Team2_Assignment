@@ -4,23 +4,23 @@ on:
   workflow_run:
     workflows: ["CI Quality Gate"]
     types: [completed]
-    branches: ["develop"]   # or develop
+    branches: [develop]
 
 permissions:
   contents: write
 
 jobs:
-  rc-draft:
+  create-draft-release:
+    name: Create Draft Release
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Checkout
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
-
-      # (optional) here you can add the API checks that SAST/SCA/DAST also succeeded
 
       - name: 🏷️ Generate RC Version
         id: version
@@ -39,6 +39,21 @@ jobs:
           body: |
             # Release Candidate
             **Version:** ${{ steps.version.outputs.rc_version }}
-            **Status:** Waiting for QA approval
+            **Status:** Waiting for team approval
+            **Branch:** develop
+            **Commit:** ${{ github.event.workflow_run.head_sha }}
+
+            ## What's Included
+            - ✅ All tests passed
+            - ✅ Code quality checks completed (ESLint)
+            - ✅ Unit tests completed with coverage
+            - ✅ Build artifacts created
+
+            ## To Approve
+            Review the test reports in the [CI Quality Gate workflow](${{ github.event.workflow_run.html_url }}), then:
+            1. Edit this release
+            2. Click **Publish release**
+
+            This will trigger the merge to `main` and deployment to staging.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
