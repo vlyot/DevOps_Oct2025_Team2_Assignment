@@ -13,13 +13,10 @@ import { PipelineData } from "./models/PipelineData";
 import multer from "multer";
 import path from "path";
 import { fileController } from "./controllers/fileController";
+import { login } from "./controllers/authController";
+import { supabase, supabaseAdmin } from "./lib/supabase";
+import { subscriberRepository } from "./repositories/SubscriberRepository";
 dotenv.config();
-
-// Initialize Supabase with the ANON key for simplicity
-const supabase = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_ANON_KEY || "",
-);
 
 const app = express();
 
@@ -130,36 +127,8 @@ async function notifyDiscord(endpoint: string, data: any): Promise<void> {
  *         $ref: '#/components/responses/InternalServerError'
  *     security: []
  */
-app.post("/login", loginLimiter, async (req, res) => {
-  const { email, password } = req.body;
+app.post("/login", loginLimiter, login);
 
-  // VALIDATION LAYER
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-  if (!validator.isEmail(email)) {
-    return res.status(400).json({ error: "Invalid email format" });
-  }
-
-  // 1. Authenticate with Supabase
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) return res.status(401).json({ error: error.message });
-
-  // 2. Get the REAL token and role
-  const accessToken = data.session?.access_token; // <--- The Real JWT
-  const role = data.user?.user_metadata?.role || "user";
-
-  // 3. Send it to the Frontend
-  return res.status(200).json({
-    token: accessToken,
-    role: role,
-    message: "Login successful!",
-  });
-});
 
 /**
  * @swagger
@@ -345,16 +314,7 @@ app.delete(
   requireAuth,
   requireAdmin,
   async (req, res) => {
-    // 1. validation to Check if the requester is an admin
-    const requesterRole = (req as any).user?.user_metadata?.role;
-    if (requesterRole !== "admin") {
-      return res.status(403).json({ error: "Access denied: Admins only" });
-    }
-
-    // 2. Delete the user using the UUID we just found
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
-      userToDelete.id
-    );
+    const { email } = req.params;
 
     try {
       // 1. Find the user by email first to get their UUID
@@ -369,15 +329,6 @@ app.delete(
         return res
           .status(404)
           .json({ error: "User with this email not found" });
-      }
-
-      // Send deletion email BEFORE deleting user
-      if (process.env.SEND_DELETE_EMAIL === "true") {
-        await emailService
-          .sendUserDeletedEmail(email)
-          .catch((err) =>
-            console.error("[Email] Failed to send user deleted email:", err),
-          );
       }
 
       // 2. Delete the user using the UUID we just found
@@ -476,13 +427,8 @@ app.put(
 
       if (updateError) throw updateError;
 
-      // Send role updated email notification
-      if (process.env.SEND_UPDATE_EMAIL === "true") {
-        emailService
-          .sendUserUpdatedEmail(email, oldRole, role)
-          .catch((err) =>
-            console.error("[Email] Failed to send user updated email:", err),
-          );
+      if (!updatedData.user) {
+        return res.status(500).json({ error: 'Failed to update user' });
       }
 
       return res.status(200).json({
@@ -493,22 +439,12 @@ app.put(
           role: updatedData.user.user_metadata.role,
         },
       });
-
-    if (updateError) throw updateError;
-
-    return res.status(200).json({
-      message: `Role for ${email} updated to ${role}`,
-      user: {
-        id: updatedData.user.id,
-        email: updatedData.user.email,
-        role: updatedData.user.user_metadata.role,
-      },
-    });
-  } catch (err: any) {
-    console.error("Update Error:", err.message);
-    return res.status(500).json({ error: err.message });
+    } catch (err: any) {
+      console.error("Update Error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
   }
-});
+);
 
 /**
  * @swagger

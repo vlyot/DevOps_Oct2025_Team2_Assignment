@@ -1,5 +1,6 @@
 export interface PipelineData {
   status: 'success' | 'failure';
+  workflowName?: string;
   branch: string;
   commit: string;
   actor: string;
