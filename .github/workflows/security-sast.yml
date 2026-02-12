@@ -1,10 +1,11 @@
 name: Security - SAST (Static Analysis)
 
+
 on:
-  push:
-    branches: [ "feat/testing-pipelines" ]
-  pull_request:
-    branches: [ "feat/testing-pipelines" ]
+  workflow_run:
+    workflows: ["CI Quality Gate"]
+    types: [completed]
+    branches: ["feat/testing-pipelines"]   # same branch as CI
   # (keep or remove schedule as you like)
 
 

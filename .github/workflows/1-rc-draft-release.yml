@@ -1,0 +1,44 @@
+name: 1️⃣ RC Draft Release
+
+on:
+  workflow_run:
+    workflows: ["CI Quality Gate"]
+    types: [completed]
+    branches: ["develop"]   # or develop
+
+permissions:
+  contents: write
+
+jobs:
+  rc-draft:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # (optional) here you can add the API checks that SAST/SCA/DAST also succeeded
+
+      - name: 🏷️ Generate RC Version
+        id: version
+        run: |
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          RC_VERSION="v0.0.0-rc.${TIMESTAMP}.${SHORT_SHA}"
+          echo "rc_version=${RC_VERSION}" >> $GITHUB_OUTPUT
+          echo "RC Version: ${RC_VERSION}"
+
+      - name: 📤 Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.rc_version }}
+          draft: true
+          body: |
+            # Release Candidate
+            **Version:** ${{ steps.version.outputs.rc_version }}
+            **Status:** Waiting for QA approval
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

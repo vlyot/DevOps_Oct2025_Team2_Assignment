@@ -2,9 +2,9 @@ name: Security - DAST (Dynamic Analysis)
 
 on:
   pull_request:
-    branches: [ "feat/testing-pipelines" ]  # PRs into this branch
+    branches: [ "develop", "main" ]   # DAST for PRs into these
   push:
-    branches: [ "feat/testing-pipelines" ]  # direct pushes/merges into this branch
+    branches: [ "develop" ]           # DAST on direct pushes to develop
   workflow_dispatch:
 
 permissions:

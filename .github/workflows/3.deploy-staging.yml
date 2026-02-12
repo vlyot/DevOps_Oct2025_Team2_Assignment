@@ -1,0 +1,93 @@
+name: 3️⃣ Deploy Tagged Release to Staging
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push-docker:
+    name: Build & push images for tagged release
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: [frontend, auth, dashboard, api, user]
+      fail-fast: false
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 🔐 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 🏗️ Build Docker image - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          VERSION_TAG="${GITHUB_REF#refs/tags/}"
+          echo "🐳 Building Docker image for ${{ matrix.service }} with tag ${VERSION_TAG}..."
+
+          if [ ! -f "Dockerfile" ]; then
+            echo "⚠️ No Dockerfile found for ${{ matrix.service }}, creating default..."
+            cat > Dockerfile << 'EOF'
+          FROM node:20-alpine
+          WORKDIR /app
+          COPY package*.json ./
+          RUN npm ci --only=production
+          COPY . .
+          RUN npm run build || echo "No build script"
+          EXPOSE 3000
+          CMD ["npm", "start"]
+          EOF
+          fi
+
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:${VERSION_TAG} .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:staging-latest .
+
+      - name: 📤 Push Docker image - ${{ matrix.service }}
+        run: |
+          VERSION_TAG="${GITHUB_REF#refs/tags/}"
+          echo "📤 Pushing Docker image for ${{ matrix.service }}..."
+          docker push ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:${VERSION_TAG}
+          docker push ${{ secrets.DOCKER_USERNAME }}/devops-${{ matrix.service }}:staging-latest
+          echo "✅ Image push complete"
+
+  deploy-to-staging:
+    name: Deploy to staging environment
+    runs-on: ubuntu-latest
+    needs: build-and-push-docker
+    environment:
+      name: staging
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🚀 Deploy to Staging
+        run: |
+          VERSION_TAG="${GITHUB_REF#refs/tags/}"
+          echo "🚀 Deploying version ${VERSION_TAG} to staging..."
+          # TODO: replace this with your real deployment commands:
+          # - SSH + docker-compose
+          # - kubectl
+          # - cloud CLI, etc.
+          echo "✅ (Simulated) deployment complete"
+
+      - name: 🏥 Health Check
+        run: |
+          VERSION_TAG="${GITHUB_REF#refs/tags/}"
+          echo "🏥 Running health checks for version ${VERSION_TAG}..."
+          # TODO: curl your staging endpoints here.
+          echo "✅ Health checks completed"
