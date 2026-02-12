@@ -9,7 +9,7 @@ export function validateEnv(): void {
 
   if (process.env.DISCORD_ENABLED === 'true') {
     const webhooks = [
-      'DISCORD_WEBHOOK_ADMIN',
+      'DISCORD_WEBHOOK_QA',
       'DISCORD_WEBHOOK_DEVELOPER',
       'DISCORD_WEBHOOK_STAKEHOLDER'
     ];

@@ -4,14 +4,14 @@ import { EmbedBuilder } from '../utils/embedBuilder';
 
 export class DiscordService {
   private webhookUrls: {
-    admin: string;
+    qa: string;
     developer: string;
     stakeholder: string;
   };
 
   constructor() {
     this.webhookUrls = {
-      admin: process.env.DISCORD_WEBHOOK_ADMIN || '',
+      qa: process.env.DISCORD_WEBHOOK_QA || '',
       developer: process.env.DISCORD_WEBHOOK_DEVELOPER || '',
       stakeholder: process.env.DISCORD_WEBHOOK_STAKEHOLDER || ''
     };
@@ -77,13 +77,10 @@ export class DiscordService {
   private getRoleWebhooks(status: 'success' | 'failure'): string[] {
     const webhooks: string[] = [];
 
-    if (status === 'success') {
-      if (this.webhookUrls.admin) webhooks.push(this.webhookUrls.admin);
-      if (this.webhookUrls.stakeholder) webhooks.push(this.webhookUrls.stakeholder);
-    } else {
-      if (this.webhookUrls.admin) webhooks.push(this.webhookUrls.admin);
-      if (this.webhookUrls.developer) webhooks.push(this.webhookUrls.developer);
-    }
+    // Send to all channels regardless of status
+    if (this.webhookUrls.qa) webhooks.push(this.webhookUrls.qa);
+    if (this.webhookUrls.developer) webhooks.push(this.webhookUrls.developer);
+    if (this.webhookUrls.stakeholder) webhooks.push(this.webhookUrls.stakeholder);
 
     return webhooks;
   }
