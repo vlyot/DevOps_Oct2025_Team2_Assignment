@@ -25,7 +25,11 @@ jobs:
       - name: 🏷️ Generate RC Version
         id: version
         run: |
-          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            SHORT_SHA=$(git rev-parse --short HEAD)
+          else
+            SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          fi
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           RC_VERSION="v0.0.0-rc.${TIMESTAMP}.${SHORT_SHA}"
           echo "rc_version=${RC_VERSION}" >> $GITHUB_OUTPUT
