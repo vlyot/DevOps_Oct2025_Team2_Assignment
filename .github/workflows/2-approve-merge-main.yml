@@ -45,8 +45,10 @@ jobs:
       - name: 🏷️ Create Release Tag
         id: tag
         run: |
-          # TODO: choose your own versioning strategy
-          RELEASE_TAG="v1.0.0"
+          # Generate semantic version from commit count and timestamp
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          RELEASE_TAG="v1.0.${COMMIT_COUNT}-${TIMESTAMP}"
           git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
           echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
 
