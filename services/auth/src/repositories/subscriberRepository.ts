@@ -10,17 +10,21 @@ export class SubscriberRepository {
   /**
    * Add a new subscriber
    */
-  async subscribe(email: string): Promise<Subscriber | null> {
-    const { data, error } = await supabase
+  async subscribe(email: string, role?: string): Promise<Subscriber | null> {
+    const { data, error} = await supabase
       .from('email_subscribers')
-      .insert({ email, is_active: true })
+      .insert({
+        email,
+        is_active: true,
+        role: role || 'stakeholder'
+      })
       .select()
       .single();
 
     if (error) {
       // If email already exists, update to active
       if (error.code === '23505') {
-        return this.reactivate(email);
+        return this.reactivate(email, role);
       }
       console.error('[Subscriber] Subscribe error:', error);
       return null;
@@ -32,10 +36,19 @@ export class SubscriberRepository {
   /**
    * Reactivate an existing subscription
    */
-  async reactivate(email: string): Promise<Subscriber | null> {
+  async reactivate(email: string, role?: string): Promise<Subscriber | null> {
+    const updateData: any = {
+      is_active: true,
+      subscribed_at: new Date().toISOString()
+    };
+
+    if (role) {
+      updateData.role = role;
+    }
+
     const { data, error } = await supabase
       .from('email_subscribers')
-      .update({ is_active: true, subscribed_at: new Date().toISOString() })
+      .update(updateData)
       .eq('email', email)
       .select()
       .single();
@@ -77,6 +90,28 @@ export class SubscriberRepository {
     if (error) {
       console.error('[Subscriber] Get active error:', error);
       return [];
+    }
+
+    return data.map(sub => sub.email);
+  }
+
+  /**
+   * Get active subscribers filtered by role
+   */
+  async getActiveSubscribersByRole(roles: string[]): Promise<string[]> {
+    if (roles.length === 0) {
+      return this.getActiveSubscribers();
+    }
+
+    const { data, error } = await supabase
+      .from('email_subscribers')
+      .select('email')
+      .eq('is_active', true)
+      .in('role', roles);
+
+    if (error) {
+      console.error('[Subscriber] Get by role error:', error);
+      return this.getActiveSubscribers();
     }
 
     return data.map(sub => sub.email);

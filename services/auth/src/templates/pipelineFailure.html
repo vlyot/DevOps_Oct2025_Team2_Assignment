@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pipeline Failed</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f8d7da; padding: 20px; border-radius: 5px; border-left: 4px solid #dc3545;">
+    <h1 style="color: #721c24;">❌ Pipeline Failed</h1>
+    <p>Hello Team,</p>
+    <p>The CI/CD pipeline encountered failures and requires attention.</p>
+
+    <div style="background-color: #ffffff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <p style="margin: 5px 0;"><strong>Branch:</strong> {{branch}}</p>
+      <p style="margin: 5px 0;"><strong>Commit:</strong> <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 3px;">{{commit}}</code></p>
+      <p style="margin: 5px 0;"><strong>Triggered by:</strong> {{actor}}</p>
+      <p style="margin: 5px 0;"><strong>Duration:</strong> {{duration}}</p>
+      <p style="margin: 5px 0;"><strong>Timestamp:</strong> {{timestamp}}</p>
+    </div>
+
+    {{failedServices}}
+
+    {{securityFindings}}
+
+    <p style="text-align: center; margin: 30px 0;">
+      <a href="{{runUrl}}" style="background-color: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Pipeline Logs</a>
+    </p>
+
+    <hr style="border: 1px solid #ddd; margin: 20px 0;">
+    <p style="color: #666; font-size: 12px;">
+      This is an automated notification from DevSecOps CI/CD Pipeline. To unsubscribe, visit your account settings.
+    </p>
+  </div>
+</body>
+</html>
