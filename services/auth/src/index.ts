@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import { requireAuth } from "./middleware/authMiddleware";
+import { requireAuth, requireAdmin } from "./middleware/authMiddleware";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import validator from "validator";
@@ -10,13 +10,15 @@ import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./config/swagger";
 import { PipelineData } from "./models/PipelineData";
-
+import multer from "multer";
+import path from "path";
+import { fileController } from "./controllers/fileController";
 dotenv.config();
 
 // Initialize Supabase with the ANON key for simplicity
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_ANON_KEY || ""
+  process.env.SUPABASE_ANON_KEY || "",
 );
 
 const app = express();
@@ -30,7 +32,7 @@ app.use(
   swaggerUi.setup(swaggerSpec, {
     customCss: ".swagger-ui .topbar { display: none }",
     customSiteTitle: "DevSecOps Auth API",
-  })
+  }),
 );
 
 app.get("/api-docs.json", (_req, res) => {
@@ -54,7 +56,7 @@ app.use(
       includeSubDomains: true,
       preload: true,
     },
-  })
+  }),
 );
 
 // 2. RATE LIMITER: Stops hackers from brute-forcing passwords
@@ -190,7 +192,7 @@ app.post("/login", loginLimiter, async (req, res) => {
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-app.post("/admin/users", requireAuth, async (req, res) => {
+app.post("/admin/users", requireAuth, requireAdmin, async (req, res) => {
   // 1. validation to Check if the requester is an admin
   const requesterRole = (req as any).user?.user_metadata?.role;
   if (requesterRole !== "admin") {
@@ -249,7 +251,7 @@ app.post("/admin/users", requireAuth, async (req, res) => {
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-app.get("/admin/users", requireAuth, async (req, res) => {
+app.get("/admin/users", requireAuth, requireAdmin, async (req, res) => {
   // 1. validation to Check if the requester is an admin
   const requesterRole = (req as any).user?.user_metadata?.role;
   if (requesterRole !== "admin") {
@@ -276,7 +278,7 @@ app.get("/admin/users", requireAuth, async (req, res) => {
         autoRefreshToken: false,
         persistSession: false,
       },
-    }
+    },
   );
 
   // 3. Use this new 'supabaseAdmin' client to fetch the list
@@ -338,32 +340,15 @@ app.get("/admin/users", requireAuth, async (req, res) => {
  *         $ref: '#/components/responses/InternalServerError'
  */
 // DELETE route - Remove a user
-app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
-  // 1. validation to Check if the requester is an admin
-  const requesterRole = (req as any).user?.user_metadata?.role;
-  if (requesterRole !== "admin") {
-    return res.status(403).json({ error: "Access denied: Admins only" });
-  }
-  const email = Array.isArray(req.params.email) ? req.params.email[0] : req.params.email;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  const supabaseAdmin = createClient(
-    process.env.SUPABASE_URL as string,
-    serviceKey as string,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-
-  try {
-    // 1. Find the user by email first to get their UUID
-    const { data: listData, error: listError } =
-      await supabaseAdmin.auth.admin.listUsers();
-
-    if (listError) throw listError;
-
-    const userToDelete = listData.users.find((u) => u.email === email);
-
-    if (!userToDelete) {
-      return res.status(404).json({ error: "User with this email not found" });
+app.delete(
+  "/admin/users/email/:email",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    // 1. validation to Check if the requester is an admin
+    const requesterRole = (req as any).user?.user_metadata?.role;
+    if (requesterRole !== "admin") {
+      return res.status(403).json({ error: "Access denied: Admins only" });
     }
 
     // 2. Delete the user using the UUID we just found
@@ -371,17 +356,47 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
       userToDelete.id
     );
 
-    if (deleteError) throw deleteError;
+    try {
+      // 1. Find the user by email first to get their UUID
+      const { data: listData, error: listError } =
+        await supabaseAdmin.auth.admin.listUsers();
 
-    return res.status(200).json({
-      message: `User ${email} deleted successfully`,
-      id: userToDelete.id,
-    });
-  } catch (err: any) {
-    console.error("Delete Error:", err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
+      if (listError) throw listError;
+
+      const userToDelete = listData.users.find((u) => u.email === email);
+
+      if (!userToDelete) {
+        return res
+          .status(404)
+          .json({ error: "User with this email not found" });
+      }
+
+      // Send deletion email BEFORE deleting user
+      if (process.env.SEND_DELETE_EMAIL === "true") {
+        await emailService
+          .sendUserDeletedEmail(email)
+          .catch((err) =>
+            console.error("[Email] Failed to send user deleted email:", err),
+          );
+      }
+
+      // 2. Delete the user using the UUID we just found
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
+        userToDelete.id,
+      );
+
+      if (deleteError) throw deleteError;
+
+      return res.status(200).json({
+        message: `User ${email} deleted successfully`,
+        id: userToDelete.id,
+      });
+    } catch (err: any) {
+      console.error("Delete Error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  },
+);
 
 /**
  * @swagger
@@ -423,34 +438,60 @@ app.delete("/admin/users/email/:email", requireAuth, async (req, res) => {
  *         $ref: '#/components/responses/InternalServerError'
  */
 // UPDATE route - Change a user's role
-app.put("/admin/users/email/:email/role", requireAuth, async (req, res) => {
-  const email = Array.isArray(req.params.email) ? req.params.email[0] : req.params.email;
-  const { role } = req.body; // e.g., { "role": "admin" }
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+app.put(
+  "/admin/users/email/:email/role",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const email = Array.isArray(req.params.email)
+      ? req.params.email[0]
+      : req.params.email;
+    const { role } = req.body; // e.g., { "role": "admin" }
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const supabaseAdmin = createClient(
-    process.env.SUPABASE_URL as string,
-    serviceKey as string,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+    const supabaseAdmin = createClient(
+      process.env.SUPABASE_URL as string,
+      serviceKey as string,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
 
-  try {
-    // 1. Find the user by email to get their ID
-    const { data: listData, error: listError } =
-      await supabaseAdmin.auth.admin.listUsers();
-    if (listError) throw listError;
+    try {
+      // 1. Find the user by email to get their ID
+      const { data: listData, error: listError } =
+        await supabaseAdmin.auth.admin.listUsers();
+      if (listError) throw listError;
 
-    const userToUpdate = listData.users.find((u) => u.email === email);
+      const userToUpdate = listData.users.find((u) => u.email === email);
 
-    if (!userToUpdate) {
-      return res.status(404).json({ error: "User not found" });
-    }
+      if (!userToUpdate) {
+        return res.status(404).json({ error: "User not found" });
+      }
 
-    // 2. Update the metadata using the ID we found
-    const oldRole = userToUpdate.user_metadata?.role || "user";
-    const { data: updatedData, error: updateError } =
-      await supabaseAdmin.auth.admin.updateUserById(userToUpdate.id, {
-        user_metadata: { role: role },
+      // 2. Update the metadata using the ID we found
+      const oldRole = userToUpdate.user_metadata?.role || "user";
+      const { data: updatedData, error: updateError } =
+        await supabaseAdmin.auth.admin.updateUserById(userToUpdate.id, {
+          user_metadata: { role: role },
+        });
+
+      if (updateError) throw updateError;
+
+      // Send role updated email notification
+      if (process.env.SEND_UPDATE_EMAIL === "true") {
+        emailService
+          .sendUserUpdatedEmail(email, oldRole, role)
+          .catch((err) =>
+            console.error("[Email] Failed to send user updated email:", err),
+          );
+      }
+
+      return res.status(200).json({
+        message: `Role for ${email} updated to ${role}`,
+        user: {
+          id: updatedData.user.id,
+          email: updatedData.user.email,
+          role: updatedData.user.user_metadata.role,
+        },
       });
 
     if (updateError) throw updateError;
@@ -511,11 +552,7 @@ app.get("/health", (_req, res) => {
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-app.get("/dashboard/files", requireAuth, (_req, res) => {
-  return res.status(200).json({
-    message: "this is your personal document list"
-  });
-});
+app.get("/dashboard/files", requireAuth, fileController.listFiles);
 
 /**
  * @swagger
@@ -571,9 +608,11 @@ app.post("/subscribe", async (req, res) => {
   }
 
   // Validate role if provided
-  const validRoles = ['admin', 'developer', 'stakeholder'];
+  const validRoles = ["admin", "developer", "stakeholder"];
   if (role && !validRoles.includes(role)) {
-    return res.status(400).json({ error: "Invalid role. Must be: admin, developer, or stakeholder" });
+    return res.status(400).json({
+      error: "Invalid role. Must be: admin, developer, or stakeholder",
+    });
   }
 
   // Subscribe
@@ -686,7 +725,7 @@ app.post("/unsubscribe", async (req, res) => {
 app.get("/subscribe/status", async (req, res) => {
   const { email } = req.query;
 
-  if (!email || typeof email !== 'string') {
+  if (!email || typeof email !== "string") {
     return res.status(400).json({ error: "Email parameter is required" });
   }
 
@@ -814,7 +853,7 @@ app.post("/pipeline/notify", async (req, res) => {
       status: pipelineData.status
     });
   } catch (error: any) {
-    console.error('[Pipeline] Notification error:', error);
+    console.error("[Pipeline] Notification error:", error);
     return res.status(500).json({ error: error.message });
   }
 });

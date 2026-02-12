@@ -1,35 +1,58 @@
-import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../lib/supabase';
+import { Request, Response, NextFunction } from "express";
+import { supabase } from "../lib/supabase";
 
-export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
-    // 1. Check if the Authorization header exists
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader) {
-        return res.status(401).json({ error: "Missing Authorization Header" });
-    }
+// Your CHOSEN simple middleware
+export const requireAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader)
+    return res.status(401).json({ error: "Missing Authorization Header" });
 
-    // 2. Extract the token (Remove "Bearer " prefix)
-    const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Missing Token" });
 
-    if (!token) {
-        return res.status(401).json({ error: "Missing Token" });
-    }
+  const { data, error } = await supabase.auth.getUser(token);
 
-    // 3. Verify the token with Supabase
-    const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) {
+    console.error("Token verification failed:", error?.message);
+    return res.status(403).json({ error: "Invalid or Expired Token" });
+  }
 
-    if (error || !data.user) {
-        console.error("Token verification failed:", error?.message);
-        return res.status(403).json({ error: "Invalid or Expired Token" });
-    }
-
-    // 4. Token is good! Attach user to request and proceed
-    (req as any).user = data.user;
-    next();
+  // Attaches the FULL Supabase User object
+  (req as any).user = data.user;
+  next();
 };
 
+// --- UPDATED ADMIN CHECK ---
+// Adjusted to read from the raw Supabase object structure
+export const requireAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const user = (req as any).user;
 
+  if (!user) {
+    return res.status(401).json({ error: "User authentication failed" });
+  }
+
+  // 1. Get role from metadata (Supabase stores it here)
+  const meta = user.user_metadata || {};
+  const appMeta = user.app_metadata || {};
+  const role = meta.role || appMeta.role || "user";
+
+  // 2. Check if Admin
+  if (role !== "admin") {
+    return res
+      .status(403)
+      .json({ error: "Access denied. Admin rights required." });
+  }
+
+  next();
+};
 
 /*import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
