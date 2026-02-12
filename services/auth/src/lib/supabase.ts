@@ -19,9 +19,12 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
+// Use service role key for admin operations, fallback to regular key if not available
+const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey;
+
 export const supabaseAdmin = createClient(
   supabaseUrl,
-  process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+  adminKey,
   {
     auth: {
       autoRefreshToken: false,
