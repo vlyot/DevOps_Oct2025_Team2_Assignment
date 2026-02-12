@@ -30,3 +30,10 @@ build/
 # Temporary files
 *.tmp
 .cache/
+
+# Robot Framework Environment
+tests/robot/robot-env/
+tests/robot/results/
+*.log
+*.html
+*.xml
