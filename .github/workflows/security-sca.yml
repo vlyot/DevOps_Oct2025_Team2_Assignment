@@ -1,0 +1,92 @@
+name: Security - SCA (Dependency Scan)
+
+on:
+  pull_request:
+    branches: [ "feat/testing-pipelines" ]  # PRs into this branch
+  push:
+    branches: [ "feat/testing-pipelines" ]  # direct pushes/merges into this branch
+  workflow_dispatch:
+
+
+permissions:
+  contents: read
+
+jobs:
+  sca-scan:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service: [frontend, auth, dashboard, api, user]
+      fail-fast: false
+
+    steps:
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. Install Dependencies - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "📦 Installing dependencies for ${{ matrix.service }}..."
+            npm install
+          else
+            echo "⚠️ No package.json found for ${{ matrix.service }}"
+            exit 0
+          fi
+
+      - name: 4. Run SCA (NPM Audit) - ${{ matrix.service }}
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "🔒 Running dependency scan for ${{ matrix.service }}..."
+            npm install -g npm-audit-html
+            npm audit --json | npm-audit-html --output ../../sca-${{ matrix.service }}.html || true
+            npm audit --audit-level=high --json > ../../sca-${{ matrix.service }}.json || true
+            
+            echo "=== SCA Report for ${{ matrix.service }} ==="
+            ls -lh ../../sca-${{ matrix.service }}.html ../../sca-${{ matrix.service }}.json || echo "SCA reports missing"
+          fi
+
+      - name: 5. Upload SCA Reports - ${{ matrix.service }}
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sca-reports-${{ matrix.service }}
+          path: |
+            sca-${{ matrix.service }}.html
+            sca-${{ matrix.service }}.json
+          retention-days: 30
+
+  sca-summary:
+    runs-on: ubuntu-latest
+    needs: sca-scan
+    if: always()
+    
+    steps:
+      - name: Generate SCA Summary
+        run: |
+          echo "## 🔒 SCA Dependency Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Scan Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Services Scanned" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend - NPM Audit" >> $GITHUB_STEP_SUMMARY
+          echo "- Auth Service - NPM Audit" >> $GITHUB_STEP_SUMMARY
+          echo "- Dashboard Service - NPM Audit" >> $GITHUB_STEP_SUMMARY
+          echo "- API Service - NPM Audit" >> $GITHUB_STEP_SUMMARY
+          echo "- User Service - NPM Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Reports Generated" >> $GITHUB_STEP_SUMMARY
+          echo "Download SCA reports (HTML + JSON) for detailed vulnerability analysis." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚠️ Action Required" >> $GITHUB_STEP_SUMMARY
+          echo "Review HIGH and CRITICAL vulnerabilities in the downloaded reports." >> $GITHUB_STEP_SUMMARY

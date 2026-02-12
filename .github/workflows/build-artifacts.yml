@@ -1,0 +1,64 @@
+name: Build Artifacts
+
+on:
+  push:
+    branches: [ "develop", "main", "feat/testing-pipelines" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-services:
+    name: Build - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service: [frontend, auth, dashboard, api, user]
+      fail-fast: false
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './services/${{ matrix.service }}/package-lock.json'
+
+      - name: 📦 Install Dependencies
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          echo "📦 Installing dependencies for ${{ matrix.service }}..."
+          npm ci
+
+      - name: 🏗️ Build Service
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if grep -q '"build"' package.json; then
+            echo "🏗️ Building ${{ matrix.service }}..."
+            npm run build
+          else
+            echo "⚠️ No build script defined, skipping..."
+          fi
+
+      - name: 📦 Create Build Archive
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          if [ -d "build" ]; then
+            tar -czf ../../${{ matrix.service }}-build.tar.gz build/
+          elif [ -d "dist" ]; then
+            tar -czf ../../${{ matrix.service }}-build.tar.gz dist/
+          fi
+
+      - name: 📤 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.service }}
+          path: ${{ matrix.service }}-build.tar.gz
+          retention-days: 30

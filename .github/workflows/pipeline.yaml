@@ -5,6 +5,7 @@ on:
     branches: [ "develop", "main" , "devops/pipeline" ]
   pull_request:
     branches: [ "develop", "main" ]
+    types: [ opened, synchronize, reopened, closed ]
 
 permissions:
   security-events: write  # Required to upload SARIF results
@@ -400,8 +401,14 @@ jobs:
   pipeline-notification:
     runs-on: ubuntu-latest
     needs: [devsecops-pipeline, sast-scan]
-    if: always()  # Run even if previous jobs fail
-    
+    # Send notifications for all pipeline runs except when PR is closed without merging
+    if: |
+      always() && !(
+        github.event_name == 'pull_request' &&
+        github.event.action == 'closed' &&
+        github.event.pull_request.merged == false
+      )
+
     steps:
       - name: Determine Pipeline Status
         id: status
@@ -413,46 +420,57 @@ jobs:
             echo "pipeline_status=success" >> $GITHUB_OUTPUT
           fi
 
-      - name: Send Email Notification
+          # Determine event description
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            if [[ "${{ github.ref_name }}" == "develop" ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
+              echo "event_description=Merged to ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            else
+              echo "event_description=Push to ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            fi
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "event_description=PR #${{ github.event.pull_request.number }} merged" >> $GITHUB_OUTPUT
+          else
+            echo "event_description=Manual trigger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Discord Notification
         continue-on-error: true
         run: |
           cat > payload.json <<'PAYLOAD_EOF'
           {
             "status": "${{ steps.status.outputs.pipeline_status }}",
+            "workflowName": "DevSecOps Pipeline - ${{ steps.status.outputs.event_description }}",
             "branch": "${{ github.ref_name }}",
             "commit": "${{ github.sha }}",
             "actor": "${{ github.actor }}",
-            "runId": "${{ github.run_id }}",
             "runUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "jobs": [
-              {"name": "devsecops-pipeline", "status": "${{ needs.devsecops-pipeline.result }}"},
-              {"name": "sast-scan", "status": "${{ needs.sast-scan.result }}"}
-            ],
             "duration": "~15 minutes",
             "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           }
           PAYLOAD_EOF
 
-          echo "📧 Sending pipeline notification..."
-          
-          # NOTE: Update AUTH_SERVICE_URL to your deployed service URL
+          echo "💬 Sending Discord pipeline notification..."
+
+          # NOTE: Update DISCORD_NOTIFIER_URL to your deployed Discord service URL
           # For local testing, you can use ngrok or similar
           # For production, set this as a GitHub secret
-          AUTH_URL="${{ secrets.AUTH_SERVICE_URL || 'http://localhost:3000' }}"
+          DISCORD_URL="${{ secrets.DISCORD_NOTIFIER_URL || 'http://localhost:3001' }}"
+          WEBHOOK_TOKEN="${{ secrets.WEBHOOK_TOKEN }}"
 
           response=$(curl -s -w "\n%{http_code}" -X POST \
             -H "Content-Type: application/json" \
+            -H "X-Webhook-Token: $WEBHOOK_TOKEN" \
             -d @payload.json \
-            "$AUTH_URL/pipeline/notify" 2>&1 || echo -e "\n000")
+            "$DISCORD_URL/notify/pipeline" 2>&1 || echo -e "\n000")
 
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
 
           if [ "$http_code" -eq 200 ]; then
-            echo "✅ Pipeline notification sent successfully"
+            echo "✅ Discord notification sent successfully"
             echo "$body"
           else
-            echo "⚠️  Pipeline notification failed (HTTP $http_code)"
+            echo "⚠️  Discord notification failed (HTTP $http_code)"
             echo "$body"
             echo "Note: This does not affect pipeline status"
           fi
