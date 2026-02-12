@@ -2,9 +2,9 @@ name: Build Artifacts
 
 on:
   push:
-    branches: [ "feat/testing-pipelines" ]        # instead of "develop", or add both
+    branches: [ "develop", "main", "feat/testing-pipelines" ]
   pull_request:
-    branches: [ "feat/testing-pipelines" ]        # PRs targeting this branch
+    branches: [ "develop", "main" ]
   workflow_dispatch:
 
 permissions:
