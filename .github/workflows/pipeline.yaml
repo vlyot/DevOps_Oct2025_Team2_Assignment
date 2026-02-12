@@ -401,11 +401,12 @@ jobs:
   pipeline-notification:
     runs-on: ubuntu-latest
     needs: [devsecops-pipeline, sast-scan]
-    # Only send notifications on push to develop/main (merged PRs) or when manually triggered
+    # Send notifications for all pipeline runs except when PR is closed without merging
     if: |
-      always() && (
-        github.event_name == 'push' ||
-        (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+      always() && !(
+        github.event_name == 'pull_request' &&
+        github.event.action == 'closed' &&
+        github.event.pull_request.merged == false
       )
 
     steps:
