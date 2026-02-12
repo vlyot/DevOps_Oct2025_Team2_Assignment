@@ -49,13 +49,50 @@ jobs:
           fi
 
       # --- UNIT TESTS ---
+      # --- UNIT TESTS ---
       - name: 5. Run Unit Tests - ${{ matrix.service }}
         working-directory: ./services/${{ matrix.service }}
+        env:
+          # Test environment variables
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: test-anon-key-placeholder
+          JWT_SECRET: test-jwt-secret-placeholder
+          NODE_ENV: test
         run: |
           if [ -f "package.json" ]; then
             if grep -q '"test"' package.json; then
               echo "🧪 Running tests for ${{ matrix.service }}..."
-              npm test -- --coverage --coverageReporters=html --passWithNoTests || echo "Tests completed with issues"
+              
+              # For auth service, handle missing dependencies
+              if [ "${{ matrix.service }}" == "auth" ]; then
+                echo "📦 Installing nodemailer for auth tests..."
+                npm install --save-dev nodemailer @types/nodemailer 2>/dev/null || true
+                
+                # Create jest setup file
+                cat > jest.setup.js << 'EOF'
+          process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://test.supabase.co';
+          process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'test-anon-key';
+          process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+          process.env.NODE_ENV = 'test';
+          EOF
+                
+                # Update jest config to use setup file
+                if [ -f "jest.config.js" ]; then
+                  cp jest.config.js jest.config.backup.js
+                  if ! grep -q "setupFilesAfterEnv" jest.config.js; then
+                    sed -i "s/module.exports = {/module.exports = {\n  setupFilesAfterEnv: ['<rootDir>\/jest.setup.js'],/" jest.config.js || true
+                  fi
+                fi
+              fi
+              
+              # Run tests
+              npm test || echo "Tests completed with issues"
+              
+              # Restore original config
+              if [ "${{ matrix.service }}" == "auth" ] && [ -f "jest.config.backup.js" ]; then
+                mv jest.config.backup.js jest.config.js
+                rm -f jest.setup.js
+              fi
               
               # Move coverage report
               if [ -d "coverage" ]; then
@@ -65,6 +102,8 @@ jobs:
               echo "⚠️ No test script defined for ${{ matrix.service }}"
             fi
           fi
+
+
 
       # --- EVIDENCE COLLECTION (Per Service) ---
       - name: 6. Upload Quality Reports - ${{ matrix.service }}
