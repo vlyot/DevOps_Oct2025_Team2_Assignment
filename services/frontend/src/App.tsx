@@ -1,10 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import AdminPage from "./pages/AdminPage";
-import UserDashboard from "./pages/UserDashboard";
-
-
-
+import { UserDashboard } from './features/user/UserDashboard';
 
 function App() {
     return (

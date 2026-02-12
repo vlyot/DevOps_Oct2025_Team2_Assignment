@@ -1,14 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export const createUser = async (userData: any) => {
-  // 1. Get the token from storage
   const token = localStorage.getItem("token");
 
   const response = await fetch(`${API_URL}/admin/users`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`, // <--- ADD THIS LINE
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(userData),
   });
@@ -18,7 +17,6 @@ export const createUser = async (userData: any) => {
   return data;
 };
 
-// New function to fetch the list from Supabase
 export const fetchUsers = async () => {
   const token = localStorage.getItem("token");
 
@@ -35,9 +33,24 @@ export const fetchUsers = async () => {
   return data;
 };
 
+export const deactivateUser = async (userId: string) => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_URL}/admin/users/${userId}/deactivate`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to deactivate user");
+
+  return data;
+};
+
 export const deleteUserByEmail = async (email: string) => {
     const token = localStorage.getItem('token');
-    // Changed URL to use /email/:email path
     const response = await fetch(`${API_URL}/admin/users/email/${email}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -52,12 +65,11 @@ export const deleteUserByEmail = async (email: string) => {
 
 export const updateUserRoleByEmail = async (email: string, newRole: string) => {
     const token = localStorage.getItem('token');
-    // Changed URL to match your new backend PUT route
     const response = await fetch(`${API_URL}/admin/users/email/${email}/role`, {
         method: 'PUT',
-        headers: { 
+        headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ role: newRole })
     });

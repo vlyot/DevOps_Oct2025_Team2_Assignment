@@ -66,3 +66,10 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.main-page {
+  padding: 25px 50px 20px 50px;
+  font-family: system-ui, sans-serif;
+  height: 80vh;
+  width: 80vw;
+}

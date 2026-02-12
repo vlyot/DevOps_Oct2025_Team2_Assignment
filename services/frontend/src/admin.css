@@ -1,0 +1,231 @@
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.admin-header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  min-width: 120px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+  color: #a7a7a7
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.table-section {
+  background: rgb(122, 122, 122);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.table-header h2 {
+  margin: 0;
+}
+
+/* Create user form */
+.create-user-form {
+  display: flex;
+  gap: 8px;
+}
+
+.create-user-form input,
+.create-user-form select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+
+.create-user-form span{
+  max-width: 30px;
+  justify-content: center;
+  align-content: center;
+}
+
+.create-user-form img {
+  width: 80%;
+  height: 80%;
+  top: 3px;
+  position: relative;
+  object-fit: fill;
+}
+
+.create-user-form button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.create-user-form button:hover {
+  background: #1d4ed8;
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  font-size: 13px;
+  color: #d1d1d1;
+  padding-bottom: 8px;
+}
+
+td {
+  padding: 12px 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+td button {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+td button:hover {
+  background: #dc2626;
+}
+
+/* Create user overlay */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.overlay-content {
+  background-color: #1f1f1f;
+  color: #fff;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  position: relative;
+}
+
+.close-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #a7a7a7;
+}
+
+.create-user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.create-user-form input {
+  width: 80%;
+  padding: 10px 12px 10px 40px;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background-color: #2a2a2a;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.create-user-form input:focus {
+  border-color: #10b981;
+  background-color: #333;
+}
+
+.create-user-form .input-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.create-user-form label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.create-user-form button {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  background-color: #10b981;
+  font-weight: 500;
+  cursor: pointer;
+  color: white;
+  font-size: 14px;
+}
+
+.create-user-form select {
+  width: 100px;
+}
+
+.create-user-form button:hover {
+  background-color: #0f9d75;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.checkbox-container input {
+  accent-color: #10b981;
+}
