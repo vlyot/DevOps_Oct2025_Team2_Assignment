@@ -12,6 +12,7 @@ on:
 permissions:
   security-events: write
   contents: read
+  actions: write
 
 jobs:
   sast-scan:
