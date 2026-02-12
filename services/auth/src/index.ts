@@ -174,7 +174,7 @@ app.post("/login", loginLimiter, async (req, res) => {
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-app.post("/admin/users", requireAuth,requireAdmin , async (req, res) => {
+app.post("/admin/users", requireAuth, requireAdmin, async (req, res) => {
   // 1. validation to Check if the requester is an admin
   const requesterRole = (req as any).user?.user_metadata?.role;
   if (requesterRole !== "admin") {
@@ -242,7 +242,7 @@ app.post("/admin/users", requireAuth,requireAdmin , async (req, res) => {
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-app.get("/admin/users", requireAuth,requireAdmin ,async (req, res) => {
+app.get("/admin/users", requireAuth, requireAdmin, async (req, res) => {
   // 1. validation to Check if the requester is an admin
   const requesterRole = (req as any).user?.user_metadata?.role;
   if (requesterRole !== "admin") {
@@ -341,7 +341,7 @@ app.get("/admin/users", requireAuth,requireAdmin ,async (req, res) => {
  *         $ref: '#/components/responses/InternalServerError'
  */
 // DELETE route - Remove a user
-app.delete("/admin/users/email/:email", requireAuth,requireAdmin, async (req, res) => {
+app.delete("/admin/users/email/:email", requireAuth, requireAdmin, async (req, res) => {
   // 1. validation to Check if the requester is an admin
   const requesterRole = (req as any).user?.user_metadata?.role;
   if (requesterRole !== "admin") {
@@ -437,7 +437,7 @@ app.delete("/admin/users/email/:email", requireAuth,requireAdmin, async (req, re
  *         $ref: '#/components/responses/InternalServerError'
  */
 // UPDATE route - Change a user's role
-app.put("/admin/users/email/:email/role", requireAuth,requireAdmin ,async (req, res) => {
+app.put("/admin/users/email/:email/role", requireAuth, requireAdmin, async (req, res) => {
   const email = Array.isArray(req.params.email)
     ? req.params.email[0]
     : req.params.email;
