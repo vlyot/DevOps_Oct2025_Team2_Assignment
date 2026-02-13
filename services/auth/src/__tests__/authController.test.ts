@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabase";
 jest.mock("../lib/supabase", () => ({
   supabase: {
     auth: {
-      signInWithPassword: jest.fn(),
+      signInWithPasswor: jest.fn(),
     },
   },
 }));
@@ -71,7 +71,7 @@ describe("Auth Controller - Login", () => {
         token: "fake-jwt-token",
         role: "admin",
         message: "Login successful!",
-      })
+      }),
     );
   });
 
